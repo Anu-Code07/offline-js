@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/types" },
+    { "path": "./packages/utils" },
+    { "path": "./packages/storage-memory" },
+    { "path": "./packages/storage-indexeddb" },
+    { "path": "./packages/network" },
+    { "path": "./packages/queue" },
+    { "path": "./packages/sync" },
+    { "path": "./packages/core" },
+    { "path": "./packages/react" },
+    { "path": "./packages/next" },
+    { "path": "./packages/devtools" }
+  ]
+}

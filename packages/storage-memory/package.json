@@ -1,0 +1,26 @@
+{
+  "name": "@offlinejs/storage-memory",
+  "version": "0.1.0",
+  "description": "In-memory OfflineJS storage adapter for tests, Node.js, and ephemeral sessions.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "latest"
+  }
+}

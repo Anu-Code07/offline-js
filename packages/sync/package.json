@@ -1,0 +1,26 @@
+{
+  "name": "@offlinejs/sync",
+  "version": "0.1.0",
+  "description": "OfflineJS sync engine for push, pull, delta, and conflict resolution.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/queue": "workspace:*",
+    "@offlinejs/types": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "latest"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@offlinejs/core",
+  "version": "0.1.0",
+  "description": "Production-grade offline-first data layer for JavaScript and TypeScript.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/network": "workspace:*",
+    "@offlinejs/queue": "workspace:*",
+    "@offlinejs/storage-memory": "workspace:*",
+    "@offlinejs/sync": "workspace:*",
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
