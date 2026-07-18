@@ -42,11 +42,13 @@ export const createValidatedStorage = (
   name: `${storage.name}:validated`,
   clear: (collection) => storage.clear(collection),
   delete: (collection, id) => storage.delete(collection, id),
-  find: <TRecord extends EntityRecord>(collection: string, query?: QueryOptions<TRecord>) =>
-    storage.find(collection, query),
-  get: <TRecord extends EntityRecord>(collection: string, id: string) =>
+  find: <TRecord extends EntityRecord>(
+    collection: string,
+    query?: QueryOptions<TRecord>
+  ): Promise<TRecord[]> => storage.find(collection, query),
+  get: <TRecord extends EntityRecord>(collection: string, id: string): Promise<TRecord | null> =>
     storage.get(collection, id),
-  async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
+  async set(collection: string, value: EntityRecord): Promise<void> {
     await assertValid(validators[collection], value, collection);
     await storage.set(collection, value);
   },

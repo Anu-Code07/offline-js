@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@offlinejs/types": "workspace:*"
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
   },
   "devDependencies": {
     "tsup": "latest",

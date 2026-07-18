@@ -110,7 +110,11 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
 
     return rows
       .filter((row) => !collection || row.collection === collection)
-      .map(({ id: _id, ...definition }) => clone(definition));
+      .map((row) => {
+        const definition = { ...row } as IndexDefinition & { id?: string };
+        delete definition.id;
+        return clone(definition);
+      });
   }
 
   async transaction<TValue>(
