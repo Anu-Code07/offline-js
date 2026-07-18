@@ -75,7 +75,10 @@ export interface StorageAdapter {
     query?: QueryOptions<TRecord>
   ): Promise<TRecord[]>;
   clear(collection?: string): Promise<void>;
-  transaction<TValue>(scope: string[], run: (store: TransactionStore) => Promise<TValue>): Promise<TValue>;
+  transaction<TValue>(
+    scope: string[],
+    run: (store: TransactionStore) => Promise<TValue>
+  ): Promise<TValue>;
   migrate?(migrations: StorageMigration[]): Promise<void>;
 }
 
@@ -139,11 +142,7 @@ export interface SyncTransport {
 }
 
 export type ConflictStrategy<TRecord extends EntityRecord = EntityRecord> =
-  | "clientWins"
-  | "serverWins"
-  | "lastWriteWins"
-  | "merge"
-  | ConflictResolver<TRecord>;
+  "clientWins" | "serverWins" | "lastWriteWins" | "merge" | ConflictResolver<TRecord>;
 
 export interface ConflictContext<TRecord extends EntityRecord = EntityRecord> {
   client: TRecord | null;
@@ -180,7 +179,7 @@ export interface OfflineEvents {
 
 export type OfflineEventName = keyof OfflineEvents;
 
-export interface EventBus<TEvents extends Record<string, unknown> = OfflineEvents> {
+export interface EventBus<TEvents extends object = OfflineEvents> {
   emit<TName extends keyof TEvents>(name: TName, payload: TEvents[TName]): void;
   off<TName extends keyof TEvents>(name: TName, listener: (payload: TEvents[TName]) => void): void;
   on<TName extends keyof TEvents>(
@@ -209,8 +208,9 @@ export type CollectionRecord<
   TName extends keyof TCollections
 > = TCollections[TName] extends EntityRecord ? TCollections[TName] : EntityRecord;
 
-export interface OfflineDB<TCollections extends CollectionMap = CollectionMap>
-  extends EventBus<OfflineEvents> {
+export interface OfflineDB<
+  TCollections extends CollectionMap = CollectionMap
+> extends EventBus<OfflineEvents> {
   collection<TName extends Extract<keyof TCollections, string>>(
     name: TName
   ): OfflineCollection<CollectionRecord<TCollections, TName>>;
@@ -230,12 +230,15 @@ export interface OfflinePluginContext<TCollections extends CollectionMap = Colle
 
 export interface OfflinePlugin<TCollections extends CollectionMap = CollectionMap> {
   name: string;
-  setup(context: OfflinePluginContext<TCollections>): void | (() => void) | Promise<void | (() => void)>;
+  setup(
+    context: OfflinePluginContext<TCollections>
+  ): void | (() => void) | Promise<void | (() => void)>;
 }
 
 export interface OfflineDBOptions<TCollections extends CollectionMap = CollectionMap> {
   baseURL?: string;
-  headers?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
+  headers?:
+    Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
   network?: NetworkMonitor;
   plugins?: Array<OfflinePlugin<TCollections>>;
   storage?: StorageAdapter;

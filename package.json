@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.33.3",
   "scripts": {
     "build": "pnpm -r --filter './packages/**' build",
-    "typecheck": "pnpm -r --filter './packages/**' typecheck",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json",
     "test": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --check .",
@@ -19,8 +19,13 @@
     "eslint": "latest",
     "prettier": "latest",
     "tsup": "latest",
-    "typescript": "latest",
+    "typescript": "5.7.3",
     "typescript-eslint": "latest",
     "vitest": "latest"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "5.7.3"
+    }
   }
 }

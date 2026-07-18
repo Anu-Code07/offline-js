@@ -1,6 +1,7 @@
 import type {
   EntityRecord,
   MutationOperation,
+  PartialEntity,
   QueueProcessingOptions,
   QueuedMutation,
   RetryOptions,
@@ -17,7 +18,7 @@ export interface AddMutationInput<TRecord extends EntityRecord = EntityRecord> {
   base?: TRecord | null;
   collection: string;
   operation: MutationOperation;
-  payload?: Partial<TRecord>;
+  payload?: PartialEntity<TRecord>;
   priority?: number;
   recordId: string;
 }
@@ -83,7 +84,9 @@ export class MutationQueue {
     });
   }
 
-  async due(options: QueueProcessingOptions = defaultQueueProcessingOptions): Promise<QueuedMutation[]> {
+  async due(
+    options: QueueProcessingOptions = defaultQueueProcessingOptions
+  ): Promise<QueuedMutation[]> {
     if (this.paused) {
       return [];
     }
@@ -109,7 +112,10 @@ export class MutationQueue {
     await this.storage.delete(this.collectionName, id);
   }
 
-  async markAttempt(id: string, status: QueuedMutation["status"] = "failed"): Promise<QueuedMutation | null> {
+  async markAttempt(
+    id: string,
+    status: QueuedMutation["status"] = "failed"
+  ): Promise<QueuedMutation | null> {
     const mutation = await this.storage.get<QueuedMutation>(this.collectionName, id);
 
     if (!mutation) {

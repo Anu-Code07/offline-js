@@ -79,13 +79,14 @@ export class BrowserNetworkMonitor implements NetworkMonitor {
 export interface FetchTransportOptions {
   baseURL: string;
   fetch?: typeof fetch;
-  headers?: Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
+  headers?:
+    Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
 }
 
 export class FetchTransport implements SyncTransport {
   private readonly baseURL: string;
   private readonly fetchImplementation: typeof fetch;
-  private readonly headers?: FetchTransportOptions["headers"];
+  private readonly headers: FetchTransportOptions["headers"] | undefined;
 
   constructor(options: FetchTransportOptions) {
     this.baseURL = options.baseURL.replace(/\/$/, "");
@@ -108,9 +109,9 @@ export class FetchTransport implements SyncTransport {
     const response = await this.fetchImplementation(
       `${this.baseURL}${request.path}${toQueryString(request.query)}`,
       {
-        body: request.body === undefined ? undefined : JSON.stringify(request.body),
         headers,
-        method: request.method
+        method: request.method,
+        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
       }
     );
 
@@ -125,8 +126,8 @@ export class FetchTransport implements SyncTransport {
 
     return {
       data,
-      etag: response.headers.get("etag") ?? undefined,
-      status: response.status
+      status: response.status,
+      ...(response.headers.get("etag") ? { etag: response.headers.get("etag") as string } : {})
     };
   }
 

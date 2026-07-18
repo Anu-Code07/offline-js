@@ -1,5 +1,7 @@
 import type { EntityRecord, QueryFilterValue, QueryOptions } from "@offlinejs/types";
 
+type OperatorFilter = Extract<QueryFilterValue, { eq?: unknown }>;
+
 export const now = (): number => Date.now();
 
 export const isBrowser = (): boolean =>
@@ -36,7 +38,9 @@ export const normalizeError = (error: unknown): Error => {
   return new Error(typeof error === "string" ? error : "Unknown OfflineJS error");
 };
 
-export const toQueryString = (query?: Record<string, string | number | boolean | undefined>): string => {
+export const toQueryString = (
+  query?: Record<string, string | number | boolean | undefined>
+): string => {
   if (!query) {
     return "";
   }
@@ -82,9 +86,13 @@ export const matchesQuery = <TRecord extends EntityRecord>(
   }
 
   const search = query.search.toLowerCase();
-  const fields = query.searchFields?.map(String) ?? Object.keys(record);
+  const fields = query.searchFields?.map((field) => String(field)) ?? Object.keys(record);
 
-  return fields.some((field) => String(record[field] ?? "").toLowerCase().includes(search));
+  return fields.some((field) =>
+    String(record[field] ?? "")
+      .toLowerCase()
+      .includes(search)
+  );
 };
 
 export const applyQuery = <TRecord extends EntityRecord>(
@@ -164,7 +172,7 @@ const matchesFilters = (
   return true;
 };
 
-const matchesOperator = (actual: unknown, expected: Exclude<QueryFilterValue, null | unknown[]>): boolean => {
+const matchesOperator = (actual: unknown, expected: OperatorFilter): boolean => {
   if ("eq" in expected && actual !== expected.eq) {
     return false;
   }
@@ -173,19 +181,19 @@ const matchesOperator = (actual: unknown, expected: Exclude<QueryFilterValue, nu
     return false;
   }
 
-  if ("gt" in expected && !(actual !== undefined && actual > expected.gt)) {
+  if ("gt" in expected && !isGreaterThan(actual, expected.gt)) {
     return false;
   }
 
-  if ("gte" in expected && !(actual !== undefined && actual >= expected.gte)) {
+  if ("gte" in expected && !isGreaterThanOrEqual(actual, expected.gte)) {
     return false;
   }
 
-  if ("lt" in expected && !(actual !== undefined && actual < expected.lt)) {
+  if ("lt" in expected && !isLessThan(actual, expected.lt)) {
     return false;
   }
 
-  if ("lte" in expected && !(actual !== undefined && actual <= expected.lte)) {
+  if ("lte" in expected && !isLessThanOrEqual(actual, expected.lte)) {
     return false;
   }
 
@@ -194,8 +202,25 @@ const matchesOperator = (actual: unknown, expected: Exclude<QueryFilterValue, nu
   }
 
   if ("contains" in expected) {
-    return String(actual ?? "").toLowerCase().includes(String(expected.contains).toLowerCase());
+    return String(actual ?? "")
+      .toLowerCase()
+      .includes(String(expected.contains).toLowerCase());
   }
 
   return true;
 };
+
+const isComparable = (value: unknown): value is number | string =>
+  typeof value === "number" || typeof value === "string";
+
+const isGreaterThan = (actual: unknown, expected: number | string | undefined): boolean =>
+  isComparable(actual) && expected !== undefined && actual > expected;
+
+const isGreaterThanOrEqual = (actual: unknown, expected: number | string | undefined): boolean =>
+  isComparable(actual) && expected !== undefined && actual >= expected;
+
+const isLessThan = (actual: unknown, expected: number | string | undefined): boolean =>
+  isComparable(actual) && expected !== undefined && actual < expected;
+
+const isLessThanOrEqual = (actual: unknown, expected: number | string | undefined): boolean =>
+  isComparable(actual) && expected !== undefined && actual <= expected;

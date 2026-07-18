@@ -58,8 +58,11 @@ export class ValidationError extends OfflineError {
   }
 }
 
-class TypedEventBus<TEvents extends Record<string, unknown>> implements EventBus<TEvents> {
-  private readonly listeners = new Map<keyof TEvents, Set<(payload: TEvents[keyof TEvents]) => void>>();
+class TypedEventBus<TEvents extends object> implements EventBus<TEvents> {
+  private readonly listeners = new Map<
+    keyof TEvents,
+    Set<(payload: TEvents[keyof TEvents]) => void>
+  >();
 
   emit<TName extends keyof TEvents>(name: TName, payload: TEvents[TName]): void {
     const listeners = this.listeners.get(name);
@@ -84,17 +87,14 @@ class TypedEventBus<TEvents extends Record<string, unknown>> implements EventBus
     return () => this.off(name, listener);
   }
 
-  off<TName extends keyof TEvents>(
-    name: TName,
-    listener: (payload: TEvents[TName]) => void
-  ): void {
+  off<TName extends keyof TEvents>(name: TName, listener: (payload: TEvents[TName]) => void): void {
     this.listeners.get(name)?.delete(listener as (payload: TEvents[keyof TEvents]) => void);
   }
 }
 
-class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
-  implements OfflineDB<TCollections>
-{
+class OfflineDatabase<
+  TCollections extends CollectionMap = CollectionMap
+> implements OfflineDB<TCollections> {
   private readonly collections = new Map<string, OfflineDataCollection<EntityRecord>>();
   private readonly disposers: Array<() => void> = [];
   private readonly events = new TypedEventBus<OfflineEvents>();
@@ -102,23 +102,19 @@ class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
   private readonly queue: MutationQueue;
   private readonly storage: StorageAdapter;
   private readonly syncEngine: SyncEngine;
-  private readonly transport?: SyncTransport;
+  private readonly transport: SyncTransport | undefined;
 
   constructor(options: OfflineDBOptions<TCollections>) {
     this.storage = options.storage ?? createMemoryStorage();
     this.network = options.network ?? new BrowserNetworkMonitor();
-    this.transport =
-      options.transport ??
-      (options.baseURL
-        ? new FetchTransport({ baseURL: options.baseURL, headers: options.headers })
-        : undefined);
+    this.transport = options.transport ?? this.createTransport(options);
     this.queue = new MutationQueue({ storage: this.storage });
     this.syncEngine = new SyncEngine({
       events: this.events,
       queue: this.queue,
       storage: this.storage,
-      sync: options.sync,
-      transport: this.transport
+      ...(this.transport ? { transport: this.transport } : {}),
+      ...(options.sync ? { sync: options.sync } : {})
     });
 
     this.disposers.push(
@@ -140,11 +136,13 @@ class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
     name: TName
   ): OfflineCollection<CollectionRecord<TCollections, TName>>;
   collection<TRecord extends EntityRecord = EntityRecord>(name: string): OfflineCollection<TRecord>;
-  collection<TRecord extends EntityRecord = EntityRecord>(name: string): OfflineCollection<TRecord> {
+  collection<TRecord extends EntityRecord = EntityRecord>(
+    name: string
+  ): OfflineCollection<TRecord> {
     const existing = this.collections.get(name);
 
     if (existing) {
-      return existing as OfflineCollection<TRecord>;
+      return existing as unknown as OfflineCollection<TRecord>;
     }
 
     const collection = new OfflineDataCollection<TRecord>({
@@ -156,7 +154,7 @@ class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
       storage: this.storage,
       syncEngine: this.syncEngine
     });
-    this.collections.set(name, collection as OfflineDataCollection<EntityRecord>);
+    this.collections.set(name, collection as unknown as OfflineDataCollection<EntityRecord>);
     return collection;
   }
 
@@ -188,7 +186,9 @@ class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
     await this.syncEngine.sync();
   }
 
-  async transaction<TValue>(run: (db: OfflineDB<TCollections>) => Promise<TValue>): Promise<TValue> {
+  async transaction<TValue>(
+    run: (db: OfflineDB<TCollections>) => Promise<TValue>
+  ): Promise<TValue> {
     const scopes = [...this.collections.keys()];
     return this.storage.transaction(scopes, () => run(this));
   }
@@ -211,9 +211,20 @@ class OfflineDatabase<TCollections extends CollectionMap = CollectionMap>
 
     return this;
   }
+
+  private createTransport(options: OfflineDBOptions<TCollections>): SyncTransport | undefined {
+    if (!options.baseURL) {
+      return undefined;
+    }
+
+    return new FetchTransport({
+      baseURL: options.baseURL,
+      ...(options.headers ? { headers: options.headers } : {})
+    });
+  }
 }
 
-interface OfflineDataCollectionOptions<TCollections extends CollectionMap, TRecord extends EntityRecord> {
+interface OfflineDataCollectionOptions<TCollections extends CollectionMap> {
   db: OfflineDB<TCollections>;
   events: EventBus<OfflineEvents>;
   name: string;
@@ -223,9 +234,7 @@ interface OfflineDataCollectionOptions<TCollections extends CollectionMap, TReco
   syncEngine: SyncEngine;
 }
 
-class OfflineDataCollection<TRecord extends EntityRecord>
-  implements OfflineCollection<TRecord>
-{
+class OfflineDataCollection<TRecord extends EntityRecord> implements OfflineCollection<TRecord> {
   private readonly db: OfflineDB;
   private readonly events: EventBus<OfflineEvents>;
   private readonly name: string;
@@ -235,7 +244,7 @@ class OfflineDataCollection<TRecord extends EntityRecord>
   private readonly subscribers = new Set<CollectionSubscriber<TRecord>>();
   private readonly syncEngine: SyncEngine;
 
-  constructor(options: OfflineDataCollectionOptions<CollectionMap, TRecord>) {
+  constructor(options: OfflineDataCollectionOptions<CollectionMap>) {
     this.db = options.db;
     this.events = options.events;
     this.name = options.name;
@@ -315,7 +324,9 @@ class OfflineDataCollection<TRecord extends EntityRecord>
 
   subscribe(callback: CollectionSubscriber<TRecord>): () => void {
     this.subscribers.add(callback);
-    void this.find().then(callback).catch((error) => this.events.emit("error", normalizeError(error)));
+    void this.find()
+      .then(callback)
+      .catch((error) => this.events.emit("error", normalizeError(error)));
 
     return () => {
       this.subscribers.delete(callback);
@@ -337,8 +348,8 @@ class OfflineDataCollection<TRecord extends EntityRecord>
       base,
       collection: this.name,
       operation,
-      payload,
-      recordId
+      recordId,
+      ...(payload === undefined ? {} : { payload })
     });
     this.events.emit("queue:add", mutation);
   }

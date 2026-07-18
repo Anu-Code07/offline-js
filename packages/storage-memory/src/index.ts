@@ -22,10 +22,7 @@ export class MemoryStorageAdapter implements StorageAdapter {
     this.name = options.name ?? "memory";
 
     for (const [collection, records] of Object.entries(options.seed ?? {})) {
-      this.records.set(
-        collection,
-        new Map(records.map((record) => [record.id, clone(record)]))
-      );
+      this.records.set(collection, new Map(records.map((record) => [record.id, clone(record)])));
     }
   }
 

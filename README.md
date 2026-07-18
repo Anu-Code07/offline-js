@@ -48,20 +48,20 @@ pnpm add @offlinejs/core @offlinejs/storage-memory
 
 ## Package architecture
 
-| Package | Why it exists |
-| --- | --- |
-| `@offlinejs/core` | Public database API, collections, optimistic writes, events, plugins, typed errors, and orchestration. |
-| `@offlinejs/types` | Shared contracts for adapters, sync, queues, plugins, and framework integrations. |
-| `@offlinejs/utils` | Tree-shakable helpers for IDs, query matching, sorting, pagination, search, backoff, and error normalization. |
-| `@offlinejs/storage-memory` | Fast in-memory adapter for Node.js, tests, SSR fallbacks, and demos. |
-| `@offlinejs/storage-indexeddb` | Durable browser storage adapter built on IndexedDB with collection indexing. |
-| `@offlinejs/queue` | Persistent mutation queue with priority, retries, pause/resume, and batch selection. |
-| `@offlinejs/network` | Browser/Node-safe network monitor and fetch transport. |
-| `@offlinejs/sync` | Push, pull, delta-ready sync engine and conflict resolution strategies. |
-| `@offlinejs/react` | Optional React integration surface around subscription stores. |
-| `@offlinejs/next` | Optional Next.js helpers for runtime-aware clients. |
-| `@offlinejs/devtools` | Plugin for inspecting OfflineJS events during development. |
-| `examples/*` | Runnable examples demonstrating package composition. |
+| Package                        | Why it exists                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `@offlinejs/core`              | Public database API, collections, optimistic writes, events, plugins, typed errors, and orchestration.        |
+| `@offlinejs/types`             | Shared contracts for adapters, sync, queues, plugins, and framework integrations.                             |
+| `@offlinejs/utils`             | Tree-shakable helpers for IDs, query matching, sorting, pagination, search, backoff, and error normalization. |
+| `@offlinejs/storage-memory`    | Fast in-memory adapter for Node.js, tests, SSR fallbacks, and demos.                                          |
+| `@offlinejs/storage-indexeddb` | Durable browser storage adapter built on IndexedDB with collection indexing.                                  |
+| `@offlinejs/queue`             | Persistent mutation queue with priority, retries, pause/resume, and batch selection.                          |
+| `@offlinejs/network`           | Browser/Node-safe network monitor and fetch transport.                                                        |
+| `@offlinejs/sync`              | Push, pull, delta-ready sync engine and conflict resolution strategies.                                       |
+| `@offlinejs/react`             | Optional React integration surface around subscription stores.                                                |
+| `@offlinejs/next`              | Optional Next.js helpers for runtime-aware clients.                                                           |
+| `@offlinejs/devtools`          | Plugin for inspecting OfflineJS events during development.                                                    |
+| `examples/*`                   | Runnable examples demonstrating package composition.                                                          |
 
 ## Folder structure
 

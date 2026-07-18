@@ -31,7 +31,7 @@ export class SyncEngine {
   private readonly queue: MutationQueue;
   private readonly storage: StorageAdapter;
   private readonly syncOptions: SyncOptions;
-  private readonly transport?: SyncTransport;
+  private readonly transport: SyncTransport | undefined;
   private running = false;
 
   constructor(options: SyncEngineOptions) {
@@ -52,7 +52,8 @@ export class SyncEngine {
     this.events.emit("sync:start", { mode: "full", queued: queued.length });
 
     try {
-      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection);
+      const pushResult =
+        this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection);
 
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
@@ -65,16 +66,18 @@ export class SyncEngine {
     }
   }
 
-  async pull<TRecord extends EntityRecord>(collection: string, since?: string | number): Promise<TRecord[]> {
+  async pull<TRecord extends EntityRecord>(
+    collection: string,
+    since?: string | number
+  ): Promise<TRecord[]> {
     if (!this.transport) {
       return [];
     }
 
-    const query = since === undefined ? undefined : { since };
     const response = await this.transport.request<TRecord[]>({
       method: "GET",
       path: `/${collection}`,
-      query
+      ...(since === undefined ? {} : { query: { since } })
     });
     const records = Array.isArray(response.data) ? response.data : [];
 
@@ -133,7 +136,10 @@ export class SyncEngine {
     }
   }
 
-  private async resolveConflict(mutation: QueuedMutation, server: EntityRecord | null): Promise<void> {
+  private async resolveConflict(
+    mutation: QueuedMutation,
+    server: EntityRecord | null
+  ): Promise<void> {
     const client = await this.storage.get<EntityRecord>(mutation.collection, mutation.recordId);
     const context: ConflictContext = {
       client,

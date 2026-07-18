@@ -5,13 +5,5 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "include": ["src/**/*.ts"],
-  "references": [
-    { "path": "../types" },
-    { "path": "../utils" },
-    { "path": "../storage-memory" },
-    { "path": "../network" },
-    { "path": "../queue" },
-    { "path": "../sync" }
-  ]
+  "include": ["src/**/*.ts"]
 }

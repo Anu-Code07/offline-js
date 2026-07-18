@@ -88,7 +88,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   }
 
   async migrate(migrations: StorageMigration[]): Promise<void> {
-    const applied = new Set((await this.find<EntityRecord>("__migrations")).map((record) => record.id));
+    const applied = new Set(
+      (await this.find<EntityRecord>("__migrations")).map((record) => record.id)
+    );
 
     for (const migration of migrations) {
       if (applied.has(migration.name)) {
@@ -160,7 +162,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     return this.databasePromise;
   }
 
-  private async request<TValue>(requestOrPromise: IDBRequest<TValue> | Promise<IDBRequest<TValue>>): Promise<TValue> {
+  private async request<TValue>(
+    requestOrPromise: IDBRequest<TValue> | Promise<IDBRequest<TValue>>
+  ): Promise<TValue> {
     const request = await requestOrPromise;
 
     return new Promise((resolve, reject) => {

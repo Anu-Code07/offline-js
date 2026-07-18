@@ -3,7 +3,13 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**", "**/.changeset/**"]
+    ignores: [
+      "**/dist/**",
+      "**/coverage/**",
+      "**/node_modules/**",
+      "**/.changeset/**",
+      "prettier.config.cjs"
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -11,7 +17,7 @@ export default tseslint.config(
     files: ["**/*.ts"],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        project: "./tsconfig.check.json",
         tsconfigRootDir: import.meta.dirname
       }
     },

@@ -42,6 +42,7 @@ describe("createOfflineDB", () => {
     const db = createOfflineDB<TestData>({
       network,
       storage: createMemoryStorage(),
+      sync: { autoStart: false },
       transport
     });
     const users = db.collection("users");
@@ -54,7 +55,8 @@ describe("createOfflineDB", () => {
     await users.sync();
 
     expect(transport.requests).toEqual([
-      expect.objectContaining({ method: "POST", path: "/users" })
+      expect.objectContaining({ method: "POST", path: "/users" }),
+      expect.objectContaining({ method: "GET", path: "/users" })
     ]);
 
     await db.destroy();
@@ -71,9 +73,7 @@ describe("createOfflineDB", () => {
     const unsubscribe = users.subscribe(subscriber);
     await users.create({ name: "Grace" });
 
-    expect(subscriber).toHaveBeenLastCalledWith([
-      expect.objectContaining({ name: "Grace" })
-    ]);
+    expect(subscriber).toHaveBeenLastCalledWith([expect.objectContaining({ name: "Grace" })]);
 
     unsubscribe();
     await db.destroy();
