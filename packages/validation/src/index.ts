@@ -1,0 +1,93 @@
+import type {
+  EntityRecord,
+  OfflinePlugin,
+  QueryOptions,
+  SchemaValidator,
+  StorageAdapter,
+  TransactionStore,
+  ValidationIssue,
+  ValidationResult
+} from "@offlinejs/types";
+
+export class OfflineValidationError extends Error {
+  readonly issues: ValidationIssue[];
+
+  constructor(issues: ValidationIssue[]) {
+    super(issues.map((issue) => issue.message).join("; ") || "Validation failed");
+    this.name = "OfflineValidationError";
+    this.issues = issues;
+  }
+}
+
+export type ValidatorMap = Record<string, SchemaValidator>;
+
+export const createRequiredFieldsValidator =
+  (fields: string[]): SchemaValidator =>
+  (record) => {
+    const issues = fields
+      .filter((field) => record[field] === undefined || record[field] === null)
+      .map((field) => ({
+        code: "required",
+        message: `"${field}" is required`,
+        path: [field]
+      }));
+
+    return { issues, valid: issues.length === 0 };
+  };
+
+export const createValidatedStorage = (
+  storage: StorageAdapter,
+  validators: ValidatorMap
+): StorageAdapter => ({
+  name: `${storage.name}:validated`,
+  clear: (collection) => storage.clear(collection),
+  delete: (collection, id) => storage.delete(collection, id),
+  find: <TRecord extends EntityRecord>(collection: string, query?: QueryOptions<TRecord>) =>
+    storage.find(collection, query),
+  get: <TRecord extends EntityRecord>(collection: string, id: string) =>
+    storage.get(collection, id),
+  async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
+    await assertValid(validators[collection], value, collection);
+    await storage.set(collection, value);
+  },
+  transaction: <TValue>(scope: string[], run: (store: TransactionStore) => Promise<TValue>) =>
+    storage.transaction(scope, run),
+  ...(storage.migrate ? { migrate: storage.migrate.bind(storage) } : {})
+});
+
+export const validationPlugin = (validators: ValidatorMap): OfflinePlugin => ({
+  name: "validation",
+  setup({ events }) {
+    return events.on("queue:add", async (mutation) => {
+      const validator = validators[mutation.collection];
+
+      if (!validator || !mutation.payload) {
+        return;
+      }
+
+      const result = await validator(mutation.payload, mutation.collection);
+
+      if (!result.valid) {
+        events.emit("error", new OfflineValidationError(result.issues));
+      }
+    });
+  }
+});
+
+export const assertValid = async (
+  validator: SchemaValidator | undefined,
+  record: EntityRecord,
+  collection: string
+): Promise<ValidationResult> => {
+  if (!validator) {
+    return { issues: [], valid: true };
+  }
+
+  const result = await validator(record, collection);
+
+  if (!result.valid) {
+    throw new OfflineValidationError(result.issues);
+  }
+
+  return result;
+};

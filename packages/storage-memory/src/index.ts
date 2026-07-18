@@ -1,7 +1,8 @@
 import type {
   EntityRecord,
+  IndexDefinition,
+  IndexableStorageAdapter,
   QueryOptions,
-  StorageAdapter,
   StorageMigration,
   TransactionStore
 } from "@offlinejs/types";
@@ -12,10 +13,11 @@ export interface MemoryStorageOptions {
   seed?: Record<string, EntityRecord[]>;
 }
 
-export class MemoryStorageAdapter implements StorageAdapter {
+export class MemoryStorageAdapter implements IndexableStorageAdapter {
   readonly name: string;
 
   private readonly records = new Map<string, Map<string, EntityRecord>>();
+  private readonly indexes = new Map<string, Map<string, IndexDefinition>>();
   private readonly appliedMigrations = new Set<string>();
 
   constructor(options: MemoryStorageOptions = {}) {
@@ -53,10 +55,34 @@ export class MemoryStorageAdapter implements StorageAdapter {
   async clear(collection?: string): Promise<void> {
     if (collection) {
       this.records.delete(collection);
+      this.indexes.delete(collection);
       return;
     }
 
     this.records.clear();
+    this.indexes.clear();
+  }
+
+  async createIndex<TRecord extends EntityRecord>(
+    definition: IndexDefinition<TRecord>
+  ): Promise<void> {
+    const collectionIndexes = this.indexes.get(definition.collection) ?? new Map();
+    collectionIndexes.set(definition.name, clone(definition as IndexDefinition));
+    this.indexes.set(definition.collection, collectionIndexes);
+  }
+
+  async dropIndex(collection: string, name: string): Promise<void> {
+    this.indexes.get(collection)?.delete(name);
+  }
+
+  async listIndexes(collection?: string): Promise<IndexDefinition[]> {
+    if (collection) {
+      return [...(this.indexes.get(collection)?.values() ?? [])].map((index) => clone(index));
+    }
+
+    return [...this.indexes.values()].flatMap((indexes) =>
+      [...indexes.values()].map((index) => clone(index))
+    );
   }
 
   async transaction<TValue>(

@@ -37,4 +37,28 @@ describe("MemoryStorageAdapter", () => {
 
     await expect(storage.find("users")).resolves.toEqual([{ id: "1", name: "Ada" }]);
   });
+
+  it("stores secondary index metadata", async () => {
+    const storage = createMemoryStorage();
+
+    await storage.createIndex({
+      collection: "users",
+      fields: ["email"],
+      name: "users_email",
+      unique: true
+    });
+
+    await expect(storage.listIndexes("users")).resolves.toEqual([
+      {
+        collection: "users",
+        fields: ["email"],
+        name: "users_email",
+        unique: true
+      }
+    ]);
+
+    await storage.dropIndex("users", "users_email");
+
+    await expect(storage.listIndexes("users")).resolves.toEqual([]);
+  });
 });

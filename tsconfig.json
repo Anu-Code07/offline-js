@@ -4,14 +4,26 @@
   "references": [
     { "path": "./packages/types" },
     { "path": "./packages/utils" },
+    { "path": "./packages/auth" },
+    { "path": "./packages/benchmarks" },
+    { "path": "./packages/conflicts" },
+    { "path": "./packages/coordination" },
+    { "path": "./packages/devtools-ui" },
+    { "path": "./packages/encryption" },
     { "path": "./packages/storage-memory" },
     { "path": "./packages/storage-indexeddb" },
+    { "path": "./packages/storage-opfs" },
+    { "path": "./packages/storage-sqlite" },
     { "path": "./packages/network" },
     { "path": "./packages/queue" },
+    { "path": "./packages/service-worker" },
     { "path": "./packages/sync" },
+    { "path": "./packages/sync-protocol" },
     { "path": "./packages/core" },
     { "path": "./packages/react" },
     { "path": "./packages/next" },
-    { "path": "./packages/devtools" }
+    { "path": "./packages/devtools" },
+    { "path": "./packages/validation" },
+    { "path": "./packages/worker-sync" }
   ]
 }

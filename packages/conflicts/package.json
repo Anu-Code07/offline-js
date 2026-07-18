@@ -1,7 +1,7 @@
 {
-  "name": "@offlinejs/react",
+  "name": "@offlinejs/conflicts",
   "version": "0.1.0",
-  "description": "React integration package placeholder for OfflineJS.",
+  "description": "CRDT-friendly conflict resolver helpers for OfflineJS.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -18,20 +18,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@offlinejs/core": "workspace:*",
     "@offlinejs/types": "workspace:*"
   },
-  "peerDependencies": {
-    "react": ">=18"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@types/react": "latest",
-    "react": "latest",
     "tsup": "latest",
     "typescript": "latest"
   }

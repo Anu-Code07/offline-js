@@ -42,6 +42,16 @@ export interface QueryOptions<TRecord extends EntityRecord = EntityRecord> {
   sort?: SortDirection;
 }
 
+export type IndexKind = "single" | "compound" | "fullText";
+
+export interface IndexDefinition<TRecord extends EntityRecord = EntityRecord> {
+  collection: string;
+  fields: Array<keyof TRecord | string>;
+  name: string;
+  unique?: boolean;
+  kind?: IndexKind;
+}
+
 export interface PaginatedResult<TRecord extends EntityRecord> {
   data: TRecord[];
   limit: number;
@@ -80,6 +90,12 @@ export interface StorageAdapter {
     run: (store: TransactionStore) => Promise<TValue>
   ): Promise<TValue>;
   migrate?(migrations: StorageMigration[]): Promise<void>;
+}
+
+export interface IndexableStorageAdapter extends StorageAdapter {
+  createIndex?<TRecord extends EntityRecord>(definition: IndexDefinition<TRecord>): Promise<void>;
+  dropIndex?(collection: string, name: string): Promise<void>;
+  listIndexes?(collection?: string): Promise<IndexDefinition[]>;
 }
 
 export type MutationOperation = "create" | "update" | "delete";
@@ -127,6 +143,7 @@ export interface TransportRequest<TBody = unknown> {
   method: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   path: string;
   query?: Record<string, string | number | boolean | undefined>;
+  timeoutMs?: number;
 }
 
 export interface TransportResponse<TData = unknown> {
@@ -139,6 +156,23 @@ export interface SyncTransport {
   request<TData = unknown, TBody = unknown>(
     request: TransportRequest<TBody>
   ): Promise<TransportResponse<TData>>;
+}
+
+export interface TransportMiddlewareContext<TBody = unknown> {
+  request: TransportRequest<TBody>;
+}
+
+export type TransportMiddleware = <TBody = unknown>(
+  context: TransportMiddlewareContext<TBody>
+) => Promise<TransportRequest<TBody>> | TransportRequest<TBody>;
+
+export interface TransportOptions {
+  baseURL: string;
+  fetch?: typeof fetch;
+  headers?:
+    Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
+  middlewares?: TransportMiddleware[];
+  timeoutMs?: number;
 }
 
 export type ConflictStrategy<TRecord extends EntityRecord = EntityRecord> =
@@ -175,6 +209,8 @@ export interface OfflineEvents {
   "queue:complete": QueuedMutation;
   conflict: ConflictContext;
   error: Error;
+  "worker:message": WorkerSyncMessage;
+  "coordination:message": CoordinationMessage;
 }
 
 export type OfflineEventName = keyof OfflineEvents;
@@ -226,6 +262,74 @@ export interface OfflinePluginContext<TCollections extends CollectionMap = Colle
   events: EventBus<OfflineEvents>;
   network: NetworkMonitor;
   storage: StorageAdapter;
+}
+
+export interface ValidationIssue {
+  code: string;
+  message: string;
+  path: string[];
+}
+
+export interface ValidationResult {
+  issues: ValidationIssue[];
+  valid: boolean;
+}
+
+export type SchemaValidator<TRecord extends EntityRecord = EntityRecord> = (
+  record: PartialEntity<TRecord>,
+  collection: string
+) => Promise<ValidationResult> | ValidationResult;
+
+export interface EncryptionCodec {
+  decrypt(value: Uint8Array): Promise<Uint8Array> | Uint8Array;
+  encrypt(value: Uint8Array): Promise<Uint8Array> | Uint8Array;
+}
+
+export interface CoordinationMessage<TPayload = unknown> {
+  id: string;
+  payload: TPayload;
+  source: string;
+  timestamp: number;
+  type: string;
+}
+
+export interface WorkerSyncMessage<TPayload = unknown> {
+  id: string;
+  payload?: TPayload;
+  timestamp: number;
+  type: "sync" | "pause" | "resume" | "status" | "shutdown";
+}
+
+export interface SyncProtocolMutation<TRecord extends EntityRecord = EntityRecord> {
+  id: string;
+  collection: string;
+  operation: MutationOperation;
+  payload?: PartialEntity<TRecord>;
+  recordId: string;
+}
+
+export interface SyncProtocolPushRequest<TRecord extends EntityRecord = EntityRecord> {
+  clientId: string;
+  mutations: Array<SyncProtocolMutation<TRecord>>;
+  since?: string | number;
+}
+
+export interface SyncProtocolPushResponse<TRecord extends EntityRecord = EntityRecord> {
+  accepted: string[];
+  conflicts: Array<ConflictContext<TRecord>>;
+  rejected: Array<{ id: string; reason: string }>;
+}
+
+export interface SyncProtocolPullRequest {
+  clientId: string;
+  collection: string;
+  limit?: number;
+  since?: string | number;
+}
+
+export interface SyncProtocolPullResponse<TRecord extends EntityRecord = EntityRecord> {
+  cursor?: string;
+  records: TRecord[];
 }
 
 export interface OfflinePlugin<TCollections extends CollectionMap = CollectionMap> {

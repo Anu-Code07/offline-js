@@ -12,7 +12,9 @@ const eventNames: OfflineEventName[] = [
   "queue:add",
   "queue:complete",
   "conflict",
-  "error"
+  "error",
+  "worker:message",
+  "coordination:message"
 ];
 
 export const devtools = (options: DevtoolsPluginOptions = {}): OfflinePlugin => ({
