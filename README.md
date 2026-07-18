@@ -46,6 +46,169 @@ For tests, SSR, workers, or ephemeral data:
 pnpm add @offlinejs/core @offlinejs/storage-memory
 ```
 
+## Usage examples
+
+### Browser app with IndexedDB
+
+Use IndexedDB for durable browser storage. Writes update local state first, then sync when the
+network is available.
+
+```ts
+import { createOfflineDB } from "@offlinejs/core";
+import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+
+type AppData = {
+  todos: {
+    id: string;
+    title: string;
+    completed: boolean;
+    createdAt?: number;
+    updatedAt?: number;
+  };
+};
+
+const db = createOfflineDB<AppData>({
+  baseURL: "https://api.example.com",
+  storage: createIndexedDBStorage({ databaseName: "my-app" }),
+  sync: {
+    autoStart: true,
+    conflictStrategy: "lastWriteWins"
+  }
+});
+
+const todos = db.collection("todos");
+
+const todo = await todos.create({
+  title: "Draft offline-first docs",
+  completed: false
+});
+
+await todos.update(todo.id, { completed: true });
+
+const openTodos = await todos.find({
+  filters: { completed: false },
+  orderBy: "createdAt",
+  sort: "desc"
+});
+```
+
+### Node.js, tests, or SSR with memory storage
+
+Use memory storage when persistence is not required or when running unit tests.
+
+```ts
+import { createOfflineDB } from "@offlinejs/core";
+import { createMemoryStorage } from "@offlinejs/storage-memory";
+
+type TestData = {
+  users: {
+    id: string;
+    name: string;
+    role?: "admin" | "member";
+  };
+};
+
+const db = createOfflineDB<TestData>({
+  storage: createMemoryStorage(),
+  sync: { enabled: false }
+});
+
+const users = db.collection("users");
+
+await users.create({ name: "Ada", role: "admin" });
+
+const admins = await users.find({
+  filters: { role: "admin" },
+  search: "ada"
+});
+```
+
+### Subscribe to local changes
+
+Subscriptions are notified after local writes and collection sync.
+
+```ts
+const unsubscribe = users.subscribe((records) => {
+  console.log("Local users changed", records);
+});
+
+await users.create({ name: "Grace" });
+
+unsubscribe();
+```
+
+### Listen for sync and queue events
+
+Use events for status indicators, telemetry, and error reporting.
+
+```ts
+db.on("offline", () => {
+  console.log("You are offline. Changes will be queued.");
+});
+
+db.on("online", () => {
+  console.log("Back online. Sync will resume.");
+});
+
+db.on("queue:add", (mutation) => {
+  console.log("Queued mutation", mutation.operation, mutation.collection);
+});
+
+db.on("sync:end", ({ completed, failed }) => {
+  console.log(`Sync complete: ${completed} completed, ${failed} failed`);
+});
+
+db.on("error", (error) => {
+  console.error("OfflineJS error", error);
+});
+```
+
+### Add a plugin
+
+Plugins receive the database, events, network monitor, and storage adapter. They can return a
+cleanup function.
+
+```ts
+const logger = () => ({
+  name: "logger",
+  setup({ events }) {
+    return events.on("sync:start", ({ queued }) => {
+      console.debug(`Starting sync for ${queued} queued mutations`);
+    });
+  }
+});
+
+db.use(logger());
+```
+
+### Use a custom transport
+
+Use `transport` when your API does not follow the default fetch conventions.
+
+```ts
+import type { SyncTransport } from "@offlinejs/core";
+
+const transport: SyncTransport = {
+  async request(request) {
+    const response = await fetch(`/api/offline${request.path}`, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body ? JSON.stringify(request.body) : undefined
+    });
+
+    return {
+      data: await response.json(),
+      status: response.status
+    };
+  }
+};
+
+const db = createOfflineDB({
+  storage: createIndexedDBStorage(),
+  transport
+});
+```
+
 ## Package architecture
 
 | Package                        | Why it exists                                                                                                 |
