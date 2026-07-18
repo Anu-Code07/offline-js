@@ -1,0 +1,28 @@
+{
+  "name": "@offlinejs/network",
+  "version": "0.1.0",
+  "description": "Network detection and fetch transport for OfflineJS.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "latest"
+  }
+}

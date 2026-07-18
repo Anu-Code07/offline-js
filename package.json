@@ -1,0 +1,31 @@
+{
+  "name": "offline-js",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "build": "pnpm -r --filter './packages/**' build",
+    "typecheck": "tsc --noEmit -p tsconfig.check.json",
+    "test": "vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "changeset": "changeset"
+  },
+  "devDependencies": {
+    "@changesets/cli": "latest",
+    "@eslint/js": "latest",
+    "@types/node": "latest",
+    "@vitest/coverage-v8": "latest",
+    "eslint": "latest",
+    "prettier": "latest",
+    "tsup": "latest",
+    "typescript": "5.7.3",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
+  },
+  "pnpm": {
+    "overrides": {
+      "typescript": "5.7.3"
+    }
+  }
+}

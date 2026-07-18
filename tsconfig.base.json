@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "paths": {
+      "@offlinejs/core": ["./packages/core/src/index.ts"],
+      "@offlinejs/network": ["./packages/network/src/index.ts"],
+      "@offlinejs/queue": ["./packages/queue/src/index.ts"],
+      "@offlinejs/storage-indexeddb": ["./packages/storage-indexeddb/src/index.ts"],
+      "@offlinejs/storage-memory": ["./packages/storage-memory/src/index.ts"],
+      "@offlinejs/sync": ["./packages/sync/src/index.ts"],
+      "@offlinejs/types": ["./packages/types/src/index.ts"],
+      "@offlinejs/utils": ["./packages/utils/src/index.ts"]
+    }
+  }
+}
