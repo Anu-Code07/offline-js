@@ -1,0 +1,28 @@
+{
+  "name": "@offlinejs/storage-opfs",
+  "version": "0.1.0",
+  "description": "Origin Private File System storage adapter for OfflineJS.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "latest",
+    "typescript": "latest"
+  }
+}

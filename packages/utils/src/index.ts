@@ -1,4 +1,12 @@
-import type { EntityRecord, QueryFilterValue, QueryOptions } from "@offlinejs/types";
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  SYNC_TRANSPORT_CONTRACT_VERSION,
+  type EntityRecord,
+  type QueryFilterValue,
+  type QueryOptions,
+  type StorageAdapter,
+  type SyncTransport
+} from "@offlinejs/types";
 
 type OperatorFilter = Extract<QueryFilterValue, { eq?: unknown }>;
 
@@ -36,6 +44,51 @@ export const normalizeError = (error: unknown): Error => {
   }
 
   return new Error(typeof error === "string" ? error : "Unknown OfflineJS error");
+};
+
+export const assertStorageAdapter = (adapter: StorageAdapter): void => {
+  const requiredMethods: Array<keyof StorageAdapter> = [
+    "get",
+    "set",
+    "delete",
+    "find",
+    "clear",
+    "transaction"
+  ];
+
+  if (!adapter.name) {
+    throw new Error("OfflineJS storage adapter requires a stable name");
+  }
+
+  for (const method of requiredMethods) {
+    if (typeof adapter[method] !== "function") {
+      throw new Error(`OfflineJS storage adapter "${adapter.name}" is missing ${String(method)}()`);
+    }
+  }
+
+  if (
+    adapter.contractVersion !== undefined &&
+    adapter.contractVersion !== STORAGE_ADAPTER_CONTRACT_VERSION
+  ) {
+    throw new Error(
+      `Unsupported storage adapter contract ${adapter.contractVersion}; expected ${STORAGE_ADAPTER_CONTRACT_VERSION}`
+    );
+  }
+};
+
+export const assertSyncTransport = (transport: SyncTransport): void => {
+  if (typeof transport.request !== "function") {
+    throw new Error("OfflineJS sync transport requires request()");
+  }
+
+  if (
+    transport.contractVersion !== undefined &&
+    transport.contractVersion !== SYNC_TRANSPORT_CONTRACT_VERSION
+  ) {
+    throw new Error(
+      `Unsupported sync transport contract ${transport.contractVersion}; expected ${SYNC_TRANSPORT_CONTRACT_VERSION}`
+    );
+  }
 };
 
 export const toQueryString = (

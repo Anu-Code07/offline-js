@@ -1,9 +1,11 @@
-import type {
-  EntityRecord,
-  QueryOptions,
-  StorageAdapter,
-  StorageMigration,
-  TransactionStore
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EntityRecord,
+  type IndexDefinition,
+  type IndexableStorageAdapter,
+  type QueryOptions,
+  type StorageMigration,
+  type TransactionStore
 } from "@offlinejs/types";
 import { applyQuery, clone } from "@offlinejs/utils";
 
@@ -20,10 +22,18 @@ export interface IndexedDBStorageOptions {
 }
 
 const STORE_NAME = "records";
+const INDEX_STORE_NAME = "indexes";
 const COLLECTION_INDEX = "collection";
 
-export class IndexedDBStorageAdapter implements StorageAdapter {
+export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   readonly name = "indexeddb";
+  readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
+  readonly capabilities = {
+    indexes: true,
+    migrations: true,
+    persistence: "durable",
+    transactions: "best-effort"
+  } as const;
 
   private readonly databaseName: string;
   private readonly version: number;
@@ -71,6 +81,7 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
   async clear(collection?: string): Promise<void> {
     if (!collection) {
       await this.request(this.store("readwrite").clear());
+      await this.request(this.indexStore("readwrite").clear());
       return;
     }
 
@@ -78,6 +89,40 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     const store = this.store("readwrite");
 
     await Promise.all(rows.map((row) => this.request(store.delete(row.key))));
+    await Promise.all(
+      (await this.listIndexes(collection)).map((index) =>
+        this.request(this.indexStore("readwrite").delete(this.indexKey(collection, index.name)))
+      )
+    );
+  }
+
+  async createIndex<TRecord extends EntityRecord>(
+    definition: IndexDefinition<TRecord>
+  ): Promise<void> {
+    await this.request(
+      this.indexStore("readwrite").put({
+        ...clone(definition as IndexDefinition),
+        id: this.indexKey(definition.collection, definition.name)
+      })
+    );
+  }
+
+  async dropIndex(collection: string, name: string): Promise<void> {
+    await this.request(this.indexStore("readwrite").delete(this.indexKey(collection, name)));
+  }
+
+  async listIndexes(collection?: string): Promise<IndexDefinition[]> {
+    const rows = await this.request<Array<IndexDefinition & { id: string }>>(
+      this.indexStore("readonly").getAll()
+    );
+
+    return rows
+      .filter((row) => !collection || row.collection === collection)
+      .map((row) => {
+        const definition = { ...row } as IndexDefinition & { id?: string };
+        delete definition.id;
+        return clone(definition);
+      });
   }
 
   async transaction<TValue>(
@@ -134,6 +179,30 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
     return requestProxy as unknown as IDBObjectStore;
   }
 
+  private indexStore(mode: IDBTransactionMode): IDBObjectStore {
+    const databasePromise = this.database();
+    const requestProxy = {
+      put: (value: IndexDefinition & { id: string }) =>
+        databasePromise.then((database) =>
+          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).put(value)
+        ),
+      delete: (key: string) =>
+        databasePromise.then((database) =>
+          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).delete(key)
+        ),
+      clear: () =>
+        databasePromise.then((database) =>
+          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).clear()
+        ),
+      getAll: () =>
+        databasePromise.then((database) =>
+          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).getAll()
+        )
+    };
+
+    return requestProxy as unknown as IDBObjectStore;
+  }
+
   private async database(): Promise<IDBDatabase> {
     if (this.databasePromise) {
       return this.databasePromise;
@@ -152,6 +221,9 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
         if (!database.objectStoreNames.contains(STORE_NAME)) {
           const store = database.createObjectStore(STORE_NAME, { keyPath: "key" });
           store.createIndex(COLLECTION_INDEX, COLLECTION_INDEX, { unique: false });
+        }
+        if (!database.objectStoreNames.contains(INDEX_STORE_NAME)) {
+          database.createObjectStore(INDEX_STORE_NAME, { keyPath: "id" });
         }
       };
 
@@ -175,6 +247,10 @@ export class IndexedDBStorageAdapter implements StorageAdapter {
 
   private key(collection: string, id: string): string {
     return `${collection}:${id}`;
+  }
+
+  private indexKey(collection: string, name: string): string {
+    return `${collection}:${name}`;
   }
 }
 

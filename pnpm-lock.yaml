@@ -25,6 +25,9 @@ importers:
       eslint:
         specifier: latest
         version: 10.7.0
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       prettier:
         specifier: latest
         version: 3.9.5
@@ -53,6 +56,61 @@ importers:
       tsx:
         specifier: latest
         version: 4.23.1
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/auth:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/benchmarks:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/conflicts:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/coordination:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
       typescript:
         specifier: 5.7.3
         version: 5.7.3
@@ -93,6 +151,35 @@ importers:
       "@offlinejs/types":
         specifier: workspace:*
         version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/devtools-ui:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/encryption:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       tsup:
         specifier: latest
@@ -157,9 +244,28 @@ importers:
       "@offlinejs/types":
         specifier: workspace:*
         version: link:../types
+    devDependencies:
+      "@types/react":
+        specifier: latest
+        version: 19.2.17
       react:
-        specifier: ">=18"
+        specifier: latest
         version: 19.2.7
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/service-worker:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       tsup:
         specifier: latest
@@ -200,11 +306,56 @@ importers:
         specifier: 5.7.3
         version: 5.7.3
 
+  packages/storage-opfs:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/storage-sqlite:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
   packages/sync:
     dependencies:
       "@offlinejs/queue":
         specifier: workspace:*
         version: link:../queue
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/sync-protocol:
+    dependencies:
       "@offlinejs/types":
         specifier: workspace:*
         version: link:../types
@@ -230,6 +381,35 @@ importers:
       "@offlinejs/types":
         specifier: workspace:*
         version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/validation:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.19)(tsx@4.23.1)(typescript@5.7.3)
+      typescript:
+        specifier: 5.7.3
+        version: 5.7.3
+
+  packages/worker-sync:
+    dependencies:
+      "@offlinejs/types":
+        specifier: workspace:*
+        version: link:../types
+      "@offlinejs/utils":
+        specifier: workspace:*
+        version: link:../utils
     devDependencies:
       tsup:
         specifier: latest
@@ -1795,6 +1975,12 @@ packages:
         integrity: sha512-nxAkRSVkN1Y0JC1W8ky/fTfkGsMmcrRsbx+3XoZE+rMOX71kLYTV7fLXpqud1GpbpP5TuffXFqfX7fH2GgZREw==
       }
 
+  "@types/react@19.2.17":
+    resolution:
+      {
+        integrity: sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==
+      }
+
   "@typescript-eslint/eslint-plugin@8.64.0":
     resolution:
       {
@@ -2137,6 +2323,12 @@ packages:
       }
     engines: { node: ">= 8" }
 
+  csstype@3.2.3:
+    resolution:
+      {
+        integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==
+      }
+
   debug@4.4.3:
     resolution:
       {
@@ -2307,6 +2499,13 @@ packages:
       {
         integrity: sha512-UOiS2in6/Q0FK0R0q6UY9vYpQ21mr/Qn1KOnte7vsACuNJf514WvCCUHSRCPcgjPT2bAhNIJdlE6bVap1GKmeg==
       }
+
+  fake-indexeddb@6.2.5:
+    resolution:
+      {
+        integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==
+      }
+    engines: { node: ">=18" }
 
   fast-deep-equal@3.1.3:
     resolution:
@@ -4322,6 +4521,10 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
+  "@types/react@19.2.17":
+    dependencies:
+      csstype: 3.2.3
+
   "@typescript-eslint/eslint-plugin@8.64.0(@typescript-eslint/parser@8.64.0(eslint@10.7.0)(typescript@5.7.3))(eslint@10.7.0)(typescript@5.7.3)":
     dependencies:
       "@eslint-community/regexpp": 4.12.2
@@ -4560,6 +4763,8 @@ snapshots:
       shebang-command: 2.0.0
       which: 2.0.2
 
+  csstype@3.2.3: {}
+
   debug@4.4.3:
     dependencies:
       ms: 2.1.3
@@ -4714,6 +4919,8 @@ snapshots:
   expect-type@1.4.0: {}
 
   extendable-error@0.1.7: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fast-deep-equal@3.1.3: {}
 

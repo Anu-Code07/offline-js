@@ -1,3 +1,4 @@
+import { useMemo, useSyncExternalStore } from "react";
 import type { EntityRecord, OfflineCollection } from "@offlinejs/types";
 
 export interface OfflineExternalStore<TRecord extends EntityRecord> {
@@ -33,3 +34,30 @@ export const createOfflineExternalStore = <TRecord extends EntityRecord>(
     }
   };
 };
+
+export interface UseOfflineCollectionResult<TRecord extends EntityRecord> {
+  create: OfflineCollection<TRecord>["create"];
+  delete: OfflineCollection<TRecord>["delete"];
+  records: TRecord[];
+  sync: OfflineCollection<TRecord>["sync"];
+  update: OfflineCollection<TRecord>["update"];
+}
+
+export const useOfflineCollection = <TRecord extends EntityRecord>(
+  collection: OfflineCollection<TRecord>
+): UseOfflineCollectionResult<TRecord> => {
+  const store = useMemo(() => createOfflineExternalStore(collection), [collection]);
+  const records = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+
+  return {
+    create: collection.create.bind(collection),
+    delete: collection.delete.bind(collection),
+    records,
+    sync: collection.sync.bind(collection),
+    update: collection.update.bind(collection)
+  };
+};
+
+export const useOfflineRecords = <TRecord extends EntityRecord>(
+  collection: OfflineCollection<TRecord>
+): TRecord[] => useOfflineCollection(collection).records;

@@ -1,9 +1,11 @@
-import type {
-  EntityRecord,
-  QueryOptions,
-  StorageAdapter,
-  StorageMigration,
-  TransactionStore
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EntityRecord,
+  type IndexDefinition,
+  type IndexableStorageAdapter,
+  type QueryOptions,
+  type StorageMigration,
+  type TransactionStore
 } from "@offlinejs/types";
 import { applyQuery, clone } from "@offlinejs/utils";
 
@@ -12,10 +14,18 @@ export interface MemoryStorageOptions {
   seed?: Record<string, EntityRecord[]>;
 }
 
-export class MemoryStorageAdapter implements StorageAdapter {
+export class MemoryStorageAdapter implements IndexableStorageAdapter {
   readonly name: string;
+  readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
+  readonly capabilities = {
+    indexes: true,
+    migrations: true,
+    persistence: "ephemeral",
+    transactions: "atomic"
+  } as const;
 
   private readonly records = new Map<string, Map<string, EntityRecord>>();
+  private readonly indexes = new Map<string, Map<string, IndexDefinition>>();
   private readonly appliedMigrations = new Set<string>();
 
   constructor(options: MemoryStorageOptions = {}) {
@@ -53,10 +63,34 @@ export class MemoryStorageAdapter implements StorageAdapter {
   async clear(collection?: string): Promise<void> {
     if (collection) {
       this.records.delete(collection);
+      this.indexes.delete(collection);
       return;
     }
 
     this.records.clear();
+    this.indexes.clear();
+  }
+
+  async createIndex<TRecord extends EntityRecord>(
+    definition: IndexDefinition<TRecord>
+  ): Promise<void> {
+    const collectionIndexes = this.indexes.get(definition.collection) ?? new Map();
+    collectionIndexes.set(definition.name, clone(definition as IndexDefinition));
+    this.indexes.set(definition.collection, collectionIndexes);
+  }
+
+  async dropIndex(collection: string, name: string): Promise<void> {
+    this.indexes.get(collection)?.delete(name);
+  }
+
+  async listIndexes(collection?: string): Promise<IndexDefinition[]> {
+    if (collection) {
+      return [...(this.indexes.get(collection)?.values() ?? [])].map((index) => clone(index));
+    }
+
+    return [...this.indexes.values()].flatMap((indexes) =>
+      [...indexes.values()].map((index) => clone(index))
+    );
   }
 
   async transaction<TValue>(

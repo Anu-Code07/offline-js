@@ -1,9 +1,11 @@
-import type {
-  NetworkMonitor,
-  NetworkState,
-  SyncTransport,
-  TransportRequest,
-  TransportResponse
+import {
+  SYNC_TRANSPORT_CONTRACT_VERSION,
+  type NetworkMonitor,
+  type NetworkState,
+  type SyncTransport,
+  type TransportOptions,
+  type TransportRequest,
+  type TransportResponse
 } from "@offlinejs/types";
 import { toQueryString } from "@offlinejs/utils";
 
@@ -76,22 +78,23 @@ export class BrowserNetworkMonitor implements NetworkMonitor {
   }
 }
 
-export interface FetchTransportOptions {
-  baseURL: string;
-  fetch?: typeof fetch;
-  headers?:
-    Record<string, string> | (() => Promise<Record<string, string>> | Record<string, string>);
-}
+export type FetchTransportOptions = TransportOptions;
 
 export class FetchTransport implements SyncTransport {
+  readonly contractVersion = SYNC_TRANSPORT_CONTRACT_VERSION;
+
   private readonly baseURL: string;
   private readonly fetchImplementation: typeof fetch;
   private readonly headers: FetchTransportOptions["headers"] | undefined;
+  private readonly middlewares: NonNullable<FetchTransportOptions["middlewares"]>;
+  private readonly timeoutMs: number | undefined;
 
   constructor(options: FetchTransportOptions) {
     this.baseURL = options.baseURL.replace(/\/$/, "");
     this.fetchImplementation = options.fetch ?? globalThis.fetch;
     this.headers = options.headers;
+    this.middlewares = options.middlewares ?? [];
+    this.timeoutMs = options.timeoutMs;
 
     if (!this.fetchImplementation) {
       throw new Error("A fetch implementation is required for this runtime");
@@ -101,34 +104,50 @@ export class FetchTransport implements SyncTransport {
   async request<TData = unknown, TBody = unknown>(
     request: TransportRequest<TBody>
   ): Promise<TransportResponse<TData>> {
+    const preparedRequest = await this.applyMiddlewares(request);
     const headers = {
       "content-type": "application/json",
       ...(await this.resolveHeaders()),
-      ...request.headers
+      ...preparedRequest.headers
     };
-    const response = await this.fetchImplementation(
-      `${this.baseURL}${request.path}${toQueryString(request.query)}`,
-      {
-        headers,
-        method: request.method,
-        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) })
+    const timeoutMs = preparedRequest.timeoutMs ?? this.timeoutMs;
+    const controller = timeoutMs ? new AbortController() : undefined;
+    const timeoutId = timeoutMs
+      ? globalThis.setTimeout(() => controller?.abort(), timeoutMs)
+      : undefined;
+
+    try {
+      const response = await this.fetchImplementation(
+        `${this.baseURL}${preparedRequest.path}${toQueryString(preparedRequest.query)}`,
+        {
+          headers,
+          method: preparedRequest.method,
+          ...(controller ? { signal: controller.signal } : {}),
+          ...(preparedRequest.body === undefined
+            ? {}
+            : { body: JSON.stringify(preparedRequest.body) })
+        }
+      );
+
+      const text = await response.text();
+      const data = text.length > 0 ? (JSON.parse(text) as TData) : (undefined as TData);
+
+      if (!response.ok) {
+        const error = new Error(`Request failed with status ${response.status}`);
+        Object.assign(error, { data, status: response.status });
+        throw error;
       }
-    );
 
-    const text = await response.text();
-    const data = text.length > 0 ? (JSON.parse(text) as TData) : (undefined as TData);
-
-    if (!response.ok) {
-      const error = new Error(`Request failed with status ${response.status}`);
-      Object.assign(error, { data, status: response.status });
-      throw error;
+      return {
+        data,
+        status: response.status,
+        ...(response.headers.get("etag") ? { etag: response.headers.get("etag") as string } : {})
+      };
+    } finally {
+      if (timeoutId) {
+        globalThis.clearTimeout(timeoutId);
+      }
     }
-
-    return {
-      data,
-      status: response.status,
-      ...(response.headers.get("etag") ? { etag: response.headers.get("etag") as string } : {})
-    };
   }
 
   private async resolveHeaders(): Promise<Record<string, string>> {
@@ -137,6 +156,18 @@ export class FetchTransport implements SyncTransport {
     }
 
     return typeof this.headers === "function" ? this.headers() : this.headers;
+  }
+
+  private async applyMiddlewares<TBody>(
+    request: TransportRequest<TBody>
+  ): Promise<TransportRequest<TBody>> {
+    let nextRequest = request;
+
+    for (const middleware of this.middlewares) {
+      nextRequest = await middleware({ request: nextRequest });
+    }
+
+    return nextRequest;
   }
 }
 

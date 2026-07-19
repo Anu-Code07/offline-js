@@ -218,12 +218,24 @@ const db = createOfflineDB({
 | `@offlinejs/utils`             | Tree-shakable helpers for IDs, query matching, sorting, pagination, search, backoff, and error normalization. |
 | `@offlinejs/storage-memory`    | Fast in-memory adapter for Node.js, tests, SSR fallbacks, and demos.                                          |
 | `@offlinejs/storage-indexeddb` | Durable browser storage adapter built on IndexedDB with collection indexing.                                  |
+| `@offlinejs/storage-sqlite`    | SQLite adapter over a pluggable async SQL driver for mobile, Electron, server, and edge runtimes.             |
+| `@offlinejs/storage-opfs`      | Origin Private File System adapter for large browser datasets.                                                |
 | `@offlinejs/queue`             | Persistent mutation queue with priority, retries, pause/resume, and batch selection.                          |
 | `@offlinejs/network`           | Browser/Node-safe network monitor and fetch transport.                                                        |
 | `@offlinejs/sync`              | Push, pull, delta-ready sync engine and conflict resolution strategies.                                       |
-| `@offlinejs/react`             | Optional React integration surface around subscription stores.                                                |
-| `@offlinejs/next`              | Optional Next.js helpers for runtime-aware clients.                                                           |
+| `@offlinejs/sync-protocol`     | Reference push/pull sync protocol envelopes and server handlers.                                              |
+| `@offlinejs/react`             | React hooks built on `useSyncExternalStore`.                                                                  |
+| `@offlinejs/next`              | Optional Next.js helpers for runtime-aware clients, cache tags, and server-action sync.                       |
 | `@offlinejs/devtools`          | Plugin for inspecting OfflineJS events during development.                                                    |
+| `@offlinejs/devtools-ui`       | Framework-free devtools event timeline renderer.                                                              |
+| `@offlinejs/service-worker`    | Service Worker background sync plugin and worker handler helpers.                                             |
+| `@offlinejs/worker-sync`       | Worker-based sync runtime helpers.                                                                            |
+| `@offlinejs/coordination`      | Multi-tab coordination over BroadcastChannel.                                                                 |
+| `@offlinejs/conflicts`         | CRDT-friendly conflict resolver helpers.                                                                      |
+| `@offlinejs/validation`        | Schema validation helpers and validated storage wrapper.                                                      |
+| `@offlinejs/encryption`        | JSON encryption storage wrapper and WebCrypto codec factory.                                                  |
+| `@offlinejs/auth`              | Auth transport wrapper and plugin patterns.                                                                   |
+| `@offlinejs/benchmarks`        | Benchmark utilities for 100k+ record adapter checks.                                                          |
 | `examples/*`                   | Runnable examples demonstrating package composition.                                                          |
 
 ## Folder structure
@@ -233,7 +245,10 @@ packages/
   core/
   storage-indexeddb/
   storage-memory/
+  storage-opfs/
+  storage-sqlite/
   sync/
+  sync-protocol/
   network/
   queue/
   types/
@@ -241,6 +256,15 @@ packages/
   react/
   next/
   devtools/
+  devtools-ui/
+  service-worker/
+  worker-sync/
+  coordination/
+  conflicts/
+  validation/
+  encryption/
+  auth/
+  benchmarks/
 examples/
   basic-node/
 docs/
@@ -249,6 +273,8 @@ docs/
   best-practices.md
   faq.md
   plugins.md
+  public-contracts.md
+  roadmap-implementation.md
   storage-adapters.md
   sync-engine.md
 ```
@@ -501,45 +527,45 @@ The repository is configured for coverage reporting with a 90%+ target as packag
 
 ### v0.1
 
-- Core collection API.
-- Memory and IndexedDB adapters.
-- Persistent mutation queue.
-- Push/pull sync engine.
-- Events, subscriptions, plugins, typed errors.
-- Foundational documentation and tests.
+- Built: Core collection API.
+- Built: Memory and IndexedDB adapters.
+- Built: Persistent mutation queue.
+- Built: Push/pull sync engine.
+- Built: Events, subscriptions, plugins, typed errors.
+- Built: Foundational documentation and tests.
 
 ### v0.2
 
-- Service Worker background sync plugin.
-- Adapter-level secondary indexes.
-- Richer API transport configuration.
-- First React hooks built on `useSyncExternalStore`.
+- Built: Service Worker background sync plugin in `@offlinejs/service-worker`.
+- Built: Adapter-level secondary-index metadata in memory and IndexedDB adapters.
+- Built: Richer fetch transport configuration with middleware and timeout support.
+- Built: First React hooks built on `useSyncExternalStore` in `@offlinejs/react`.
 
 ### v0.3
 
-- Schema validation plugin.
-- Encryption plugin.
-- Auth plugin patterns.
-- Next.js cache and server-action examples.
+- Built: Schema validation helpers and validated storage wrapper in `@offlinejs/validation`.
+- Built: Encryption storage wrapper and WebCrypto AES-GCM codec factory in `@offlinejs/encryption`.
+- Built: Auth transport wrapper and plugin patterns in `@offlinejs/auth`.
+- Built: Next.js cache tag and server-action sync helpers in `@offlinejs/next`.
 
 ### v0.5
 
-- SQLite adapter.
-- OPFS adapter.
-- Worker-based sync runtime.
-- Devtools UI package.
+- Built: SQLite adapter over a pluggable async SQL driver in `@offlinejs/storage-sqlite`.
+- Built: OPFS adapter in `@offlinejs/storage-opfs`.
+- Built: Worker-based sync runtime helpers in `@offlinejs/worker-sync`.
+- Built: Framework-free devtools UI package in `@offlinejs/devtools-ui`.
 
 ### v0.8
 
-- Multi-tab coordination.
-- CRDT-friendly conflict resolver helpers.
-- Server sync protocol reference implementation.
-- Performance benchmarks for 100k+ records.
+- Built: Multi-tab coordination in `@offlinejs/coordination`.
+- Built: CRDT-friendly conflict resolver helpers in `@offlinejs/conflicts`.
+- Built: Server sync protocol reference implementation in `@offlinejs/sync-protocol`.
+- Built: Performance benchmark utilities for 100k+ records in `@offlinejs/benchmarks`.
 
 ### v1.0
 
-- Stable public contracts.
-- Backwards-compatible adapter API.
-- Full docs site.
-- 90%+ coverage across core packages.
-- Production hardening for large datasets, migrations, and background sync.
+- In progress: Stable public contracts.
+- In progress: Backwards-compatible adapter API.
+- In progress: Full docs site.
+- In progress: 90%+ coverage across core packages.
+- In progress: Production hardening for large datasets, migrations, and background sync.

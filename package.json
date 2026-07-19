@@ -9,6 +9,7 @@
     "test": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --check .",
+    "docs:build": "node docs-site/build.mjs",
     "changeset": "changeset"
   },
   "devDependencies": {
@@ -17,6 +18,7 @@
     "@types/node": "latest",
     "@vitest/coverage-v8": "latest",
     "eslint": "latest",
+    "fake-indexeddb": "^6.2.5",
     "prettier": "latest",
     "tsup": "latest",
     "typescript": "5.7.3",

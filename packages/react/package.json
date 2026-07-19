@@ -30,6 +30,8 @@
     }
   },
   "devDependencies": {
+    "@types/react": "latest",
+    "react": "latest",
     "tsup": "latest",
     "typescript": "latest"
   }
