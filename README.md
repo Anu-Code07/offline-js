@@ -1,72 +1,50 @@
 # OfflineJS
 
-OfflineJS is a production-grade offline-first data layer for TypeScript and JavaScript.
-The flagship package is `@offlinejs/core`, a framework-agnostic client that hides network
-detection, local persistence, optimistic updates, mutation queues, retries, sync, and conflict
-resolution behind a small collection API.
+Offline-first data layer for TypeScript and JavaScript.
+
+Write to local storage immediately. Sync when the network is back. Retry failed mutations automatically. Resolve conflicts with a strategy you choose.
 
 ```ts
 import { createOfflineDB } from "@offlinejs/core";
 import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 
-type AppData = {
-  users: { id: string; name: string; age?: number; updatedAt?: number };
-};
-
-const db = createOfflineDB<AppData>({
+const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage(),
-  sync: {
-    conflictStrategy: "lastWriteWins"
-  }
+  storage: createIndexedDBStorage({ databaseName: "my-app" }),
+  sync: { conflictStrategy: "lastWriteWins" }
 });
 
-const users = db.collection("users");
+const todos = db.collection("todos");
 
-await users.create({ name: "John" });
-await users.update("user_1", { age: 25 });
-await users.delete("user_1");
-
-const data = await users.find({
-  filters: { age: { gte: 18 } },
-  orderBy: "name",
-  sort: "asc"
-});
+await todos.create({ title: "Works offline", completed: false });
+const open = await todos.find({ filters: { completed: false } });
 ```
 
-## Documentation site
+## Install
 
-This repo ships a Vercel-ready docs site under `docs-site/`.
-
-```bash
-pnpm docs:build
-```
-
-Output lands in `docs-site/dist`. Root `vercel.json` points Vercel at that folder.
-
-## Installation
+Browser apps:
 
 ```bash
 pnpm add @offlinejs/core @offlinejs/storage-indexeddb
 ```
 
-For tests, SSR, workers, or ephemeral data:
+Node, tests, or SSR (no persistence needed):
 
 ```bash
 pnpm add @offlinejs/core @offlinejs/storage-memory
 ```
 
-## Usage examples
+React:
 
-### Browser app with IndexedDB
+```bash
+pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/react
+```
 
-Use IndexedDB for durable browser storage. Writes update local state first, then sync when the
-network is available.
+## Quick start
+
+### 1. Define your collections
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
-
 type AppData = {
   todos: {
     id: string;
@@ -75,7 +53,19 @@ type AppData = {
     createdAt?: number;
     updatedAt?: number;
   };
+  users: {
+    id: string;
+    name: string;
+    role?: "admin" | "member";
+  };
 };
+```
+
+### 2. Create the database
+
+```ts
+import { createOfflineDB } from "@offlinejs/core";
+import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 
 const db = createOfflineDB<AppData>({
   baseURL: "https://api.example.com",
@@ -85,11 +75,15 @@ const db = createOfflineDB<AppData>({
     conflictStrategy: "lastWriteWins"
   }
 });
+```
 
+### 3. Read and write through collections
+
+```ts
 const todos = db.collection("todos");
 
 const todo = await todos.create({
-  title: "Draft offline-first docs",
+  title: "Ship offline sync",
   completed: false
 });
 
@@ -100,90 +94,162 @@ const openTodos = await todos.find({
   orderBy: "createdAt",
   sort: "desc"
 });
+
+const one = await todos.findOne(todo.id);
+await todos.delete(todo.id);
 ```
 
-### Node.js, tests, or SSR with memory storage
+What happens under the hood:
 
-Use memory storage when persistence is not required or when running unit tests.
+1. The write lands in local storage immediately (optimistic).
+2. The mutation is queued for sync.
+3. When online, OfflineJS pushes queued changes and pulls remote updates.
+4. Conflicts are resolved with your chosen strategy.
+
+## Implementation examples
+
+### Query, filter, sort, and paginate
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createMemoryStorage } from "@offlinejs/storage-memory";
-
-type TestData = {
-  users: {
-    id: string;
-    name: string;
-    role?: "admin" | "member";
-  };
-};
-
-const db = createOfflineDB<TestData>({
-  storage: createMemoryStorage(),
-  sync: { enabled: false }
-});
-
 const users = db.collection("users");
 
-await users.create({ name: "Ada", role: "admin" });
+await users.find({
+  filters: {
+    role: "admin",
+    age: { gte: 18 }
+  },
+  search: "ada",
+  orderBy: "name",
+  sort: "asc",
+  limit: 20,
+  offset: 0
+});
 
-const admins = await users.find({
-  filters: { role: "admin" },
-  search: "ada"
+const page = await users.paginate({
+  limit: 20,
+  offset: 40,
+  orderBy: "name"
 });
 ```
 
 ### Subscribe to local changes
 
-Subscriptions are notified after local writes and collection sync.
+Use this to keep UI in sync with local writes and collection sync.
 
 ```ts
-const unsubscribe = users.subscribe((records) => {
-  console.log("Local users changed", records);
+const unsubscribe = todos.subscribe((records) => {
+  renderTodos(records);
 });
 
-await users.create({ name: "Grace" });
+await todos.create({ title: "New task", completed: false });
 
 unsubscribe();
 ```
 
-### Listen for sync and queue events
+### Manual sync
 
-Use events for status indicators, telemetry, and error reporting.
+```ts
+// Sync one collection
+await todos.sync();
+
+// Sync everything
+await db.sync();
+```
+
+### Listen for offline / sync events
 
 ```ts
 db.on("offline", () => {
-  console.log("You are offline. Changes will be queued.");
+  showBanner("You are offline. Changes will sync later.");
 });
 
 db.on("online", () => {
-  console.log("Back online. Sync will resume.");
+  showBanner("Back online. Syncing…");
 });
 
 db.on("queue:add", (mutation) => {
-  console.log("Queued mutation", mutation.operation, mutation.collection);
+  console.debug("queued", mutation.operation, mutation.collection);
 });
 
 db.on("sync:end", ({ completed, failed }) => {
-  console.log(`Sync complete: ${completed} completed, ${failed} failed`);
+  console.info(`Sync finished: ${completed} ok, ${failed} failed`);
+});
+
+db.on("conflict", (context) => {
+  console.warn("Conflict resolved", context);
 });
 
 db.on("error", (error) => {
-  console.error("OfflineJS error", error);
+  reportError(error);
 });
 ```
 
-### Add a plugin
+### Choose a conflict strategy
 
-Plugins receive the database, events, network monitor, and storage adapter. They can return a
-cleanup function.
+Built-in options: `clientWins`, `serverWins`, `lastWriteWins`, `merge`, or a custom resolver.
+
+```ts
+const db = createOfflineDB({
+  storage: createIndexedDBStorage(),
+  sync: {
+    conflictStrategy: async ({ client, server }) => ({
+      ...server,
+      ...client,
+      reviewed: true
+    })
+  }
+});
+```
+
+### Use memory storage in tests or Node
+
+```ts
+import { createOfflineDB } from "@offlinejs/core";
+import { createMemoryStorage } from "@offlinejs/storage-memory";
+
+const db = createOfflineDB({
+  storage: createMemoryStorage(),
+  sync: { enabled: false }
+});
+
+const users = db.collection("users");
+await users.create({ name: "Ada", role: "admin" });
+```
+
+Runnable example: [`examples/basic-node`](./examples/basic-node).
+
+### Use React hooks
+
+```tsx
+import { useOfflineCollection } from "@offlinejs/react";
+
+function TodoList({ todos }) {
+  const { records, create, update, delete: remove } = useOfflineCollection(todos);
+
+  return (
+    <ul>
+      {records.map((todo) => (
+        <li key={todo.id}>
+          <button onClick={() => update(todo.id, { completed: !todo.completed })}>
+            {todo.title}
+          </button>
+          <button onClick={() => remove(todo.id)}>Delete</button>
+        </li>
+      ))}
+      <button onClick={() => create({ title: "New todo", completed: false })}>Add</button>
+    </ul>
+  );
+}
+```
+
+### Add a plugin
 
 ```ts
 const logger = () => ({
   name: "logger",
   setup({ events }) {
     return events.on("sync:start", ({ queued }) => {
-      console.debug(`Starting sync for ${queued} queued mutations`);
+      console.debug(`Starting sync for ${queued} mutations`);
     });
   }
 });
@@ -191,12 +257,16 @@ const logger = () => ({
 db.use(logger());
 ```
 
-### Use a custom transport
+Common plugin use cases: auth headers, logging, validation, encryption, analytics, and devtools.
 
-Use `transport` when your API does not follow the default fetch conventions.
+### Connect a custom API transport
+
+Use this when your backend does not match the default fetch paths.
 
 ```ts
 import type { SyncTransport } from "@offlinejs/core";
+import { createOfflineDB } from "@offlinejs/core";
+import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 
 const transport: SyncTransport = {
   async request(request) {
@@ -219,315 +289,105 @@ const db = createOfflineDB({
 });
 ```
 
-## Package architecture
+### Handle errors
 
-| Package                        | Why it exists                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `@offlinejs/core`              | Public database API, collections, optimistic writes, events, plugins, typed errors, and orchestration.        |
-| `@offlinejs/types`             | Shared contracts for adapters, sync, queues, plugins, and framework integrations.                             |
-| `@offlinejs/utils`             | Tree-shakable helpers for IDs, query matching, sorting, pagination, search, backoff, and error normalization. |
-| `@offlinejs/storage-memory`    | Fast in-memory adapter for Node.js, tests, SSR fallbacks, and demos.                                          |
-| `@offlinejs/storage-indexeddb` | Durable browser storage adapter built on IndexedDB with collection indexing.                                  |
-| `@offlinejs/storage-sqlite`    | SQLite adapter over a pluggable async SQL driver for mobile, Electron, server, and edge runtimes.             |
-| `@offlinejs/storage-opfs`      | Origin Private File System adapter for large browser datasets.                                                |
-| `@offlinejs/queue`             | Persistent mutation queue with priority, retries, pause/resume, and batch selection.                          |
-| `@offlinejs/network`           | Browser/Node-safe network monitor and fetch transport.                                                        |
-| `@offlinejs/sync`              | Push, pull, delta-ready sync engine and conflict resolution strategies.                                       |
-| `@offlinejs/sync-protocol`     | Reference push/pull sync protocol envelopes and server handlers.                                              |
-| `@offlinejs/react`             | React hooks built on `useSyncExternalStore`.                                                                  |
-| `@offlinejs/next`              | Optional Next.js helpers for runtime-aware clients, cache tags, and server-action sync.                       |
-| `@offlinejs/devtools`          | Plugin for inspecting OfflineJS events during development.                                                    |
-| `@offlinejs/devtools-ui`       | Framework-free devtools event timeline renderer.                                                              |
-| `@offlinejs/service-worker`    | Service Worker background sync plugin and worker handler helpers.                                             |
-| `@offlinejs/worker-sync`       | Worker-based sync runtime helpers.                                                                            |
-| `@offlinejs/coordination`      | Multi-tab coordination over BroadcastChannel.                                                                 |
-| `@offlinejs/conflicts`         | CRDT-friendly conflict resolver helpers.                                                                      |
-| `@offlinejs/validation`        | Schema validation helpers and validated storage wrapper.                                                      |
-| `@offlinejs/encryption`        | JSON encryption storage wrapper and WebCrypto codec factory.                                                  |
-| `@offlinejs/auth`              | Auth transport wrapper and plugin patterns.                                                                   |
-| `@offlinejs/benchmarks`        | Benchmark utilities for 100k+ record adapter checks.                                                          |
-| `examples/*`                   | Runnable examples demonstrating package composition.                                                          |
+```ts
+import {
+  ConflictError,
+  OfflineError,
+  StorageError,
+  SyncError,
+  ValidationError
+} from "@offlinejs/core";
 
-## Folder structure
-
-```txt
-packages/
-  core/
-  storage-indexeddb/
-  storage-memory/
-  storage-opfs/
-  storage-sqlite/
-  sync/
-  sync-protocol/
-  network/
-  queue/
-  types/
-  utils/
-  react/
-  next/
-  devtools/
-  devtools-ui/
-  service-worker/
-  worker-sync/
-  coordination/
-  conflicts/
-  validation/
-  encryption/
-  auth/
-  benchmarks/
-examples/
-  basic-node/
-docs/
-  api-reference.md
-  architecture.md
-  best-practices.md
-  faq.md
-  plugins.md
-  public-contracts.md
-  storage-adapters.md
-  sync-engine.md
+try {
+  await todos.sync();
+} catch (error) {
+  if (error instanceof SyncError) {
+    // mutation stays queued and will retry
+  } else if (error instanceof ConflictError) {
+    // conflict strategy could not resolve
+  } else if (error instanceof StorageError) {
+    // local persistence failed
+  } else if (error instanceof ValidationError) {
+    // invalid input
+  } else if (error instanceof OfflineError) {
+    // other OfflineJS error
+  }
+}
 ```
 
-## Public API
+Failed syncs do not drop queued mutations. They retry with backoff until they succeed or you clear them.
+
+## API cheat sheet
 
 ```ts
 const db = createOfflineDB({
   baseURL,
   storage,
   sync,
+  transport,
   plugins
 });
 
 const users = db.collection("users");
 
-await users.find();
+await users.find(query);
 await users.findOne(id);
+await users.paginate(query);
 await users.create(data);
 await users.update(id, data);
 await users.delete(id);
 await users.sync();
 users.subscribe((records) => {});
 
-db.on("sync:start", ({ queued }) => {});
-db.on("sync:end", ({ completed, failed }) => {});
-db.on("offline", (state) => {});
-db.on("online", (state) => {});
-db.on("queue:add", (mutation) => {});
-db.on("queue:complete", (mutation) => {});
-db.on("conflict", (context) => {});
-db.on("error", (error) => {});
+await db.sync();
+db.use(plugin);
+db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:complete" | "conflict" | "error", handler);
 ```
 
-## High-level architecture
+## Packages you will actually use
 
-```mermaid
-flowchart TD
-  UI[Application / Framework] --> Core["@offlinejs/core"]
-  Core --> Storage["StorageAdapter"]
-  Core --> Queue["@offlinejs/queue"]
-  Core --> Network["@offlinejs/network"]
-  Core --> Events["Typed Event Bus"]
-  Core --> Plugins["Plugin Runtime"]
-  Queue --> Storage
-  Core --> Sync["@offlinejs/sync"]
-  Sync --> Queue
-  Sync --> Storage
-  Sync --> Transport["SyncTransport / fetch"]
-  Transport --> API[Remote API]
+| Package | When to use it |
+| --- | --- |
+| `@offlinejs/core` | Create the DB, collections, events, plugins |
+| `@offlinejs/storage-indexeddb` | Durable browser storage |
+| `@offlinejs/storage-memory` | Tests, Node, SSR, demos |
+| `@offlinejs/storage-sqlite` | Mobile, Electron, server SQLite |
+| `@offlinejs/storage-opfs` | Large browser datasets via OPFS |
+| `@offlinejs/react` | React hooks for collections |
+| `@offlinejs/next` | Next.js helpers |
+| `@offlinejs/auth` | Auth-aware transport / plugin patterns |
+| `@offlinejs/validation` | Schema validation around storage |
+| `@offlinejs/encryption` | Encrypt records at rest |
+| `@offlinejs/devtools` / `@offlinejs/devtools-ui` | Inspect events while developing |
+
+## Docs
+
+| Doc | What it covers |
+| --- | --- |
+| [API reference](./docs/api-reference.md) | `createOfflineDB`, collections, events |
+| [Best practices](./docs/best-practices.md) | Storage, sync, and production tips |
+| [Storage adapters](./docs/storage-adapters.md) | Choosing and configuring adapters |
+| [Sync engine](./docs/sync-engine.md) | Push, pull, delta, retries |
+| [Plugins](./docs/plugins.md) | Extending OfflineJS |
+| [FAQ](./docs/faq.md) | Common consumer questions |
+| [Architecture](./docs/architecture.md) | How the pieces fit together |
+
+### Docs site
+
+```bash
+pnpm docs:build
 ```
 
-## Class diagram
+Static output is written to `docs-site/dist`. Root `vercel.json` is ready for Vercel.
 
-```mermaid
-classDiagram
-  class OfflineDB {
-    +collection(name)
-    +sync()
-    +transaction(run)
-    +use(plugin)
-    +on(event, listener)
-  }
+## Tips for production apps
 
-  class OfflineCollection {
-    +find(query)
-    +findOne(id)
-    +create(data)
-    +update(id, data)
-    +delete(id)
-    +subscribe(callback)
-    +sync()
-  }
-
-  class StorageAdapter {
-    <<interface>>
-    +get(collection, id)
-    +set(collection, value)
-    +delete(collection, id)
-    +find(collection, query)
-    +clear(collection)
-    +transaction(scope, run)
-  }
-
-  class MutationQueue {
-    +add(input)
-    +all()
-    +due(options)
-    +markAttempt(id)
-    +remove(id)
-    +pause()
-    +resume()
-  }
-
-  class SyncEngine {
-    +sync(collection)
-    +pull(collection, since)
-  }
-
-  OfflineDB --> OfflineCollection
-  OfflineCollection --> StorageAdapter
-  OfflineCollection --> MutationQueue
-  OfflineDB --> SyncEngine
-  SyncEngine --> MutationQueue
-  SyncEngine --> StorageAdapter
-```
-
-## Storage adapter design
-
-```ts
-interface StorageAdapter {
-  get<TRecord>(collection: string, id: string): Promise<TRecord | null>;
-  set<TRecord>(collection: string, value: TRecord): Promise<void>;
-  delete(collection: string, id: string): Promise<void>;
-  find<TRecord>(collection: string, query?: QueryOptions<TRecord>): Promise<TRecord[]>;
-  clear(collection?: string): Promise<void>;
-  transaction<TValue>(
-    scope: string[],
-    run: (store: TransactionStore) => Promise<TValue>
-  ): Promise<TValue>;
-}
-```
-
-Current adapters:
-
-- IndexedDB for durable browser persistence.
-- Memory for Node.js, tests, SSR fallbacks, and short-lived workers.
-
-Future adapters:
-
-- SQLite for mobile, Electron, and server runtimes.
-- OPFS for browser file-backed datasets.
-- LocalStorage for tiny datasets and legacy environments.
-
-## Sync engine design
-
-```txt
-Offline
-  -> optimistic local write
-  -> persistent queue
-  -> reconnect
-  -> batch due mutations
-  -> push sync
-  -> conflict resolution
-  -> pull/delta sync
-  -> remove completed queue items
-```
-
-Supported sync modes:
-
-- Push sync: queued local mutations are sent to the server.
-- Pull sync: server records are written into local storage.
-- Delta sync: `since` values can be passed to `pull()` and API query params.
-- Incremental sync: collection-level `sync()` limits work to a single collection.
-
-## Queue implementation
-
-Queued mutations include operation, collection, record id, payload, base snapshot, priority,
-retry count, last attempt timestamp, and status. The queue is storage-backed, so it survives
-refreshes when paired with IndexedDB. Processing selects due mutations by priority and creation
-time, applies exponential backoff with jitter, and removes mutations only after success.
-
-## Conflict resolution
-
-Built-in strategies:
-
-- `clientWins`
-- `serverWins`
-- `lastWriteWins`
-- `merge`
-- custom async resolver
-
-```ts
-const db = createOfflineDB({
-  sync: {
-    conflictStrategy: async ({ client, server }) => ({
-      ...server,
-      ...client,
-      reviewed: true
-    })
-  }
-});
-```
-
-## Plugin system
-
-Plugins receive the database, event bus, network monitor, and storage adapter. They can subscribe
-to lifecycle events, decorate behavior externally, and return a disposer.
-
-```ts
-const logger = () => ({
-  name: "logger",
-  setup({ events }) {
-    return events.on("error", (error) => console.error(error));
-  }
-});
-
-db.use(logger());
-```
-
-Use plugins for auth headers, encryption, analytics, logging, schema validation, and devtools.
-
-## Error handling
-
-`@offlinejs/core` exports:
-
-- `OfflineError`
-- `ConflictError`
-- `StorageError`
-- `SyncError`
-- `ValidationError`
-
-Exceptions are surfaced through rejected promises and the `error` event. Sync failures never delete
-queued mutations; they are retried according to queue policy.
-
-## Performance strategy
-
-- Storage adapters own persistence and can add native indexes.
-- Querying supports pagination, filtering, sorting, and search at the adapter boundary.
-- Sync uses batches to avoid long main-thread work and oversized network requests.
-- Queue backoff avoids hot retry loops when APIs are unavailable.
-- Collections notify subscribers only after local writes or collection sync.
-- Packages are ESM, side-effect free, and tree-shakable.
-- Large datasets should use indexed adapters, server-side delta sync, and small `limit` windows.
-
-## Testing strategy
-
-Vitest covers:
-
-- offline optimistic writes
-- reconnect sync
-- retries and queue preservation
-- conflict strategy behavior
-- memory storage
-- collection subscriptions
-- pagination, filtering, sorting, and search
-
-The repository is configured for coverage reporting with a 90%+ target as packages mature.
-
-## Internal implementation plan
-
-1. Keep public contracts in `@offlinejs/types`.
-2. Keep framework-independent behavior in core packages.
-3. Add adapters without changing `@offlinejs/core`.
-4. Add framework packages as optional peer integrations.
-5. Add advanced production features behind stable interfaces: schema validation, encryption,
-   worker-based sync, service-worker background sync, and adapter-specific indexes.
+- Prefer IndexedDB (or SQLite/OPFS) over memory storage in real apps.
+- Keep records JSON-serializable.
+- Paginate large collections (`limit` / `offset` or `paginate()`).
+- Pick an explicit conflict strategy for each product flow.
+- Subscribe at page/feature boundaries, not every tiny component.
+- Listen to `error` and send it to your observability tool.
+- Use a custom `transport` when your API shape differs from the defaults.
