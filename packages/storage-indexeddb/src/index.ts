@@ -1,10 +1,11 @@
-import type {
-  EntityRecord,
-  IndexDefinition,
-  IndexableStorageAdapter,
-  QueryOptions,
-  StorageMigration,
-  TransactionStore
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EntityRecord,
+  type IndexDefinition,
+  type IndexableStorageAdapter,
+  type QueryOptions,
+  type StorageMigration,
+  type TransactionStore
 } from "@offlinejs/types";
 import { applyQuery, clone } from "@offlinejs/utils";
 
@@ -26,6 +27,13 @@ const COLLECTION_INDEX = "collection";
 
 export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   readonly name = "indexeddb";
+  readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
+  readonly capabilities = {
+    indexes: true,
+    migrations: true,
+    persistence: "durable",
+    transactions: "best-effort"
+  } as const;
 
   private readonly databaseName: string;
   private readonly version: number;

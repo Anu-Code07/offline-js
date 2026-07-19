@@ -1,10 +1,11 @@
-import type {
-  NetworkMonitor,
-  NetworkState,
-  SyncTransport,
-  TransportOptions,
-  TransportRequest,
-  TransportResponse
+import {
+  SYNC_TRANSPORT_CONTRACT_VERSION,
+  type NetworkMonitor,
+  type NetworkState,
+  type SyncTransport,
+  type TransportOptions,
+  type TransportRequest,
+  type TransportResponse
 } from "@offlinejs/types";
 import { toQueryString } from "@offlinejs/utils";
 
@@ -80,6 +81,8 @@ export class BrowserNetworkMonitor implements NetworkMonitor {
 export type FetchTransportOptions = TransportOptions;
 
 export class FetchTransport implements SyncTransport {
+  readonly contractVersion = SYNC_TRANSPORT_CONTRACT_VERSION;
+
   private readonly baseURL: string;
   private readonly fetchImplementation: typeof fetch;
   private readonly headers: FetchTransportOptions["headers"] | undefined;

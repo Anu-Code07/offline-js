@@ -37,4 +37,40 @@ describe("MutationQueue", () => {
 
     await expect(queue.due()).resolves.toHaveLength(1);
   });
+
+  it("marks attempts, applies retry limits, removes, and clears mutations", async () => {
+    const queue = createMutationQueue({ storage: createMemoryStorage() });
+    const mutation = await queue.add({
+      base: { id: "1", name: "Old" },
+      collection: "users",
+      operation: "update",
+      payload: { name: "New" },
+      recordId: "1"
+    });
+
+    await expect(queue.markAttempt(mutation.id, "processing")).resolves.toMatchObject({
+      retries: 1,
+      status: "processing"
+    });
+    await expect(queue.markAttempt("missing")).resolves.toBeNull();
+    await expect(
+      queue.due({
+        batchSize: 10,
+        retry: {
+          baseDelayMs: 1_000_000,
+          factor: 2,
+          jitter: false,
+          maxAttempts: 1,
+          maxDelayMs: 1_000_000
+        }
+      })
+    ).resolves.toEqual([]);
+
+    await queue.remove(mutation.id);
+    await expect(queue.all()).resolves.toEqual([]);
+
+    await queue.add({ collection: "users", operation: "create", recordId: "2" });
+    await queue.clear();
+    await expect(queue.all()).resolves.toEqual([]);
+  });
 });

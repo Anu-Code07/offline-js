@@ -1,12 +1,13 @@
-import type {
-  EntityRecord,
-  OfflinePlugin,
-  QueryOptions,
-  SchemaValidator,
-  StorageAdapter,
-  TransactionStore,
-  ValidationIssue,
-  ValidationResult
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EntityRecord,
+  type OfflinePlugin,
+  type QueryOptions,
+  type SchemaValidator,
+  type StorageAdapter,
+  type TransactionStore,
+  type ValidationIssue,
+  type ValidationResult
 } from "@offlinejs/types";
 
 export class OfflineValidationError extends Error {
@@ -40,6 +41,8 @@ export const createValidatedStorage = (
   validators: ValidatorMap
 ): StorageAdapter => ({
   name: `${storage.name}:validated`,
+  contractVersion: STORAGE_ADAPTER_CONTRACT_VERSION,
+  ...(storage.capabilities ? { capabilities: storage.capabilities } : {}),
   clear: (collection) => storage.clear(collection),
   delete: (collection, id) => storage.delete(collection, id),
   find: <TRecord extends EntityRecord>(

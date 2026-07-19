@@ -61,4 +61,39 @@ describe("MemoryStorageAdapter", () => {
 
     await expect(storage.listIndexes("users")).resolves.toEqual([]);
   });
+
+  it("lists all indexes, skips applied migrations, and clears all records", async () => {
+    const storage = createMemoryStorage();
+    let migrationRuns = 0;
+
+    await storage.set("users", { id: "1", name: "Ada" });
+    await storage.createIndex({ collection: "users", fields: ["email"], name: "users_email" });
+    await storage.createIndex({
+      collection: "projects",
+      fields: ["title"],
+      name: "projects_title"
+    });
+    await storage.migrate([
+      {
+        name: "once",
+        up: async () => {
+          migrationRuns += 1;
+        }
+      }
+    ]);
+    await storage.migrate([
+      {
+        name: "once",
+        up: async () => {
+          migrationRuns += 1;
+        }
+      }
+    ]);
+
+    await expect(storage.listIndexes()).resolves.toHaveLength(2);
+    expect(migrationRuns).toBe(1);
+    await storage.clear();
+    await expect(storage.find("users")).resolves.toEqual([]);
+    await expect(storage.listIndexes()).resolves.toEqual([]);
+  });
 });

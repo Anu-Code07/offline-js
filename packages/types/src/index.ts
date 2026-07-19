@@ -1,5 +1,9 @@
 export type RecordId = string;
 
+export const OFFLINEJS_PUBLIC_API_VERSION = "1.0.0";
+export const STORAGE_ADAPTER_CONTRACT_VERSION = 1;
+export const SYNC_TRANSPORT_CONTRACT_VERSION = 1;
+
 export type EntityRecord = {
   id: RecordId;
   [key: string]: unknown;
@@ -75,8 +79,17 @@ export interface StorageMigration {
   up(storage: TransactionStore): Promise<void>;
 }
 
+export interface StorageAdapterCapabilities {
+  indexes?: boolean;
+  migrations?: boolean;
+  persistence?: "durable" | "ephemeral";
+  transactions?: "atomic" | "best-effort";
+}
+
 export interface StorageAdapter {
   readonly name: string;
+  readonly contractVersion?: typeof STORAGE_ADAPTER_CONTRACT_VERSION;
+  readonly capabilities?: StorageAdapterCapabilities;
   get<TRecord extends EntityRecord>(collection: string, id: RecordId): Promise<TRecord | null>;
   set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void>;
   delete(collection: string, id: RecordId): Promise<void>;
@@ -153,6 +166,7 @@ export interface TransportResponse<TData = unknown> {
 }
 
 export interface SyncTransport {
+  readonly contractVersion?: typeof SYNC_TRANSPORT_CONTRACT_VERSION;
   request<TData = unknown, TBody = unknown>(
     request: TransportRequest<TBody>
   ): Promise<TransportResponse<TData>>;

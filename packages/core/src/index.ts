@@ -21,7 +21,14 @@ import type {
   StorageAdapter,
   SyncTransport
 } from "@offlinejs/types";
-import { countQuery, createId, normalizeError, now } from "@offlinejs/utils";
+import {
+  assertStorageAdapter,
+  assertSyncTransport,
+  countQuery,
+  createId,
+  normalizeError,
+  now
+} from "@offlinejs/utils";
 
 export class OfflineError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -103,11 +110,16 @@ class OfflineDatabase<
   private readonly storage: StorageAdapter;
   private readonly syncEngine: SyncEngine;
   private readonly transport: SyncTransport | undefined;
+  private destroyed = false;
 
   constructor(options: OfflineDBOptions<TCollections>) {
     this.storage = options.storage ?? createMemoryStorage();
+    assertStorageAdapter(this.storage);
     this.network = options.network ?? new BrowserNetworkMonitor();
     this.transport = options.transport ?? this.createTransport(options);
+    if (this.transport) {
+      assertSyncTransport(this.transport);
+    }
     this.queue = new MutationQueue({ storage: this.storage });
     this.syncEngine = new SyncEngine({
       events: this.events,
@@ -121,7 +133,7 @@ class OfflineDatabase<
       this.network.subscribe((state) => {
         this.events.emit(state.online ? "online" : "offline", state);
 
-        if (state.online && options.sync?.autoStart !== false) {
+        if (!this.destroyed && state.online && options.sync?.autoStart !== false) {
           void this.sync().catch((error) => this.events.emit("error", normalizeError(error)));
         }
       })
@@ -159,6 +171,7 @@ class OfflineDatabase<
   }
 
   async destroy(): Promise<void> {
+    this.destroyed = true;
     for (const dispose of this.disposers.splice(0)) {
       dispose();
     }
@@ -183,6 +196,10 @@ class OfflineDatabase<
   }
 
   async sync(): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
+
     await this.syncEngine.sync();
   }
 
@@ -204,6 +221,11 @@ class OfflineDatabase<
     )
       .then((dispose) => {
         if (typeof dispose === "function") {
+          if (this.destroyed) {
+            dispose();
+            return;
+          }
+
           this.disposers.push(dispose);
         }
       })

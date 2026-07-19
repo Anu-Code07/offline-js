@@ -1,9 +1,10 @@
-import type {
-  EncryptionCodec,
-  EntityRecord,
-  QueryOptions,
-  StorageAdapter,
-  TransactionStore
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EncryptionCodec,
+  type EntityRecord,
+  type QueryOptions,
+  type StorageAdapter,
+  type TransactionStore
 } from "@offlinejs/types";
 import { applyQuery } from "@offlinejs/utils";
 
@@ -17,6 +18,8 @@ export const createJsonEncryptionStorage = (
   codec: EncryptionCodec
 ): StorageAdapter => ({
   name: `${storage.name}:encrypted`,
+  contractVersion: STORAGE_ADAPTER_CONTRACT_VERSION,
+  ...(storage.capabilities ? { capabilities: storage.capabilities } : {}),
   clear: (collection) => storage.clear(collection),
   delete: (collection, id) => storage.delete(collection, id),
   async find<TRecord extends EntityRecord>(

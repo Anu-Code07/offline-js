@@ -273,6 +273,7 @@ docs/
   best-practices.md
   faq.md
   plugins.md
+  public-contracts.md
   roadmap-implementation.md
   storage-adapters.md
   sync-engine.md

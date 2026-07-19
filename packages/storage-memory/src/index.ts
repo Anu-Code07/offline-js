@@ -1,10 +1,11 @@
-import type {
-  EntityRecord,
-  IndexDefinition,
-  IndexableStorageAdapter,
-  QueryOptions,
-  StorageMigration,
-  TransactionStore
+import {
+  STORAGE_ADAPTER_CONTRACT_VERSION,
+  type EntityRecord,
+  type IndexDefinition,
+  type IndexableStorageAdapter,
+  type QueryOptions,
+  type StorageMigration,
+  type TransactionStore
 } from "@offlinejs/types";
 import { applyQuery, clone } from "@offlinejs/utils";
 
@@ -15,6 +16,13 @@ export interface MemoryStorageOptions {
 
 export class MemoryStorageAdapter implements IndexableStorageAdapter {
   readonly name: string;
+  readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
+  readonly capabilities = {
+    indexes: true,
+    migrations: true,
+    persistence: "ephemeral",
+    transactions: "atomic"
+  } as const;
 
   private readonly records = new Map<string, Map<string, EntityRecord>>();
   private readonly indexes = new Map<string, Map<string, IndexDefinition>>();

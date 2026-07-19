@@ -50,7 +50,12 @@ export default defineConfig({
     coverage: {
       include: ["packages/*/src/**/*.ts"],
       provider: "v8",
-      reporter: ["text", "json-summary"]
+      reporter: ["text", "json-summary"],
+      thresholds: {
+        functions: 90,
+        lines: 90,
+        statements: 90
+      }
     },
     globals: true,
     include: ["packages/**/*.test.ts"]
