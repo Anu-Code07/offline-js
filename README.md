@@ -378,10 +378,10 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 
 ```bash
 pnpm docs:build
-# or: node docs-site/build.mjs
+# or: node docs-site/build.cjs
 ```
 
-Static output is written to `docs-site/dist`. Vercel builds with `node docs-site/build.mjs` (no install needed).
+Static output is written to `docs-site/out` (committed for Vercel) and mirrored to `docs-site/dist` locally. Vercel deploys the prebuilt `docs-site/out` folder with no package install.
 
 ## Tips for production apps
 

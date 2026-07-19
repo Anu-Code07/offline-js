@@ -1,0 +1,8 @@
+{
+  "name": "@offlinejs/docs-site",
+  "private": true,
+  "description": "Static OfflineJS documentation site (zero runtime dependencies).",
+  "scripts": {
+    "build": "node build.cjs"
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>Quick Start · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>Quick Start</h1><p>Install OfflineJS and start writing local-first data in minutes.</p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb</code></pre><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
+import { createIndexedDBStorage } from &quot;@offlinejs/storage-indexeddb&quot;;
+
+const db = createOfflineDB({
+  baseURL: &quot;https://api.example.com&quot;,
+  storage: createIndexedDBStorage({ databaseName: &quot;my-app&quot; }),
+  sync: { conflictStrategy: &quot;lastWriteWins&quot; }
+});
+
+const todos = db.collection(&quot;todos&quot;);
+await todos.create({ title: &quot;Ship offline sync&quot;, completed: false });
+const open = await todos.find({ filters: { completed: false } });</code></pre><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
+<li>Mutations enter a durable queue.</li>
+<li>Sync resumes when the network returns.</li>
+<li>Conflicts resolve with your chosen strategy.</li>
+</ul>
+<h2>Keep exploring</h2><ul><li><a href="api.html">API Reference</a></li>
+<li><a href="storage.html">Storage Adapters</a></li>
+<li><a href="sync.html">Sync Engine</a></li>
+<li><a href="plugins.html">Plugins</a></li>
+</ul>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>

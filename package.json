@@ -9,7 +9,8 @@
     "test": "vitest run --coverage",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "docs:build": "node docs-site/build.mjs",
+    "docs:build": "node docs-site/build.cjs",
+    "vercel-build": "node docs-site/build.cjs",
     "changeset": "changeset"
   },
   "devDependencies": {
