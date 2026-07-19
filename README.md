@@ -34,6 +34,16 @@ const data = await users.find({
 });
 ```
 
+## Documentation site
+
+This repo ships a Vercel-ready docs site under `docs-site/`.
+
+```bash
+pnpm docs:build
+```
+
+Output lands in `docs-site/dist`. Root `vercel.json` points Vercel at that folder.
+
 ## Installation
 
 ```bash
@@ -274,7 +284,6 @@ docs/
   faq.md
   plugins.md
   public-contracts.md
-  roadmap-implementation.md
   storage-adapters.md
   sync-engine.md
 ```
@@ -522,50 +531,3 @@ The repository is configured for coverage reporting with a 90%+ target as packag
 4. Add framework packages as optional peer integrations.
 5. Add advanced production features behind stable interfaces: schema validation, encryption,
    worker-based sync, service-worker background sync, and adapter-specific indexes.
-
-## Roadmap
-
-### v0.1
-
-- Built: Core collection API.
-- Built: Memory and IndexedDB adapters.
-- Built: Persistent mutation queue.
-- Built: Push/pull sync engine.
-- Built: Events, subscriptions, plugins, typed errors.
-- Built: Foundational documentation and tests.
-
-### v0.2
-
-- Built: Service Worker background sync plugin in `@offlinejs/service-worker`.
-- Built: Adapter-level secondary-index metadata in memory and IndexedDB adapters.
-- Built: Richer fetch transport configuration with middleware and timeout support.
-- Built: First React hooks built on `useSyncExternalStore` in `@offlinejs/react`.
-
-### v0.3
-
-- Built: Schema validation helpers and validated storage wrapper in `@offlinejs/validation`.
-- Built: Encryption storage wrapper and WebCrypto AES-GCM codec factory in `@offlinejs/encryption`.
-- Built: Auth transport wrapper and plugin patterns in `@offlinejs/auth`.
-- Built: Next.js cache tag and server-action sync helpers in `@offlinejs/next`.
-
-### v0.5
-
-- Built: SQLite adapter over a pluggable async SQL driver in `@offlinejs/storage-sqlite`.
-- Built: OPFS adapter in `@offlinejs/storage-opfs`.
-- Built: Worker-based sync runtime helpers in `@offlinejs/worker-sync`.
-- Built: Framework-free devtools UI package in `@offlinejs/devtools-ui`.
-
-### v0.8
-
-- Built: Multi-tab coordination in `@offlinejs/coordination`.
-- Built: CRDT-friendly conflict resolver helpers in `@offlinejs/conflicts`.
-- Built: Server sync protocol reference implementation in `@offlinejs/sync-protocol`.
-- Built: Performance benchmark utilities for 100k+ records in `@offlinejs/benchmarks`.
-
-### v1.0
-
-- In progress: Stable public contracts.
-- In progress: Backwards-compatible adapter API.
-- In progress: Full docs site.
-- In progress: 90%+ coverage across core packages.
-- In progress: Production hardening for large datasets, migrations, and background sync.
