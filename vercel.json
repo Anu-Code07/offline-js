@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "echo \"Docs site has no install dependencies\"",
-  "buildCommand": "node docs-site/build.mjs",
-  "outputDirectory": "docs-site/dist",
   "framework": null,
+  "installCommand": "echo \"Static docs — no install required\"",
+  "buildCommand": "test -f docs-site/out/index.html && test -f docs-site/out/assets/styles.css && echo \"Deploying prebuilt docs-site/out\"",
+  "outputDirectory": "docs-site/out",
   "cleanUrls": true,
   "trailingSlash": false,
   "headers": [

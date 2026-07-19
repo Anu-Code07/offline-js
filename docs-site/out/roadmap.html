@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>Roadmap · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html" aria-current="page">Roadmap</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>Roadmap Implementation</h1><p>This document maps the v0.2 through v0.8 roadmap to the packages now available in the
+workspace. These are production-facing foundations: APIs are typed, framework-independent where
+possible, and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin and worker handler helpers.</li>
+<li>Adapter-level indexes: <code>createIndex</code>, <code>dropIndex</code>, and <code>listIndexes</code> on indexable adapters.</li>
+<li><code>@offlinejs/network</code>: middleware and timeout-aware fetch transport.</li>
+<li><code>@offlinejs/react</code>: <code>useOfflineCollection</code> and <code>useOfflineRecords</code> built on</li>
+</ul>  <code>useSyncExternalStore</code>.</p><h2>v0.3</h2><ul><li><code>@offlinejs/validation</code>: validator helpers and validated storage wrapper.</li>
+<li><code>@offlinejs/encryption</code>: encrypted JSON storage wrapper and WebCrypto AES-GCM codec factory.</li>
+<li><code>@offlinejs/auth</code>: auth transport wrapper and plugin pattern.</li>
+<li><code>@offlinejs/next</code>: cache tag and server-action sync helpers.</li>
+</ul>
+<h2>v0.5</h2><ul><li><code>@offlinejs/storage-sqlite</code>: SQLite adapter over a pluggable async SQL driver.</li>
+<li><code>@offlinejs/storage-opfs</code>: Origin Private File System adapter for large browser datasets.</li>
+<li><code>@offlinejs/worker-sync</code>: worker message protocol and runtime helpers.</li>
+<li><code>@offlinejs/devtools-ui</code>: framework-free event timeline renderer.</li>
+</ul>
+<h2>v0.8</h2><ul><li><code>@offlinejs/coordination</code>: BroadcastChannel-based multi-tab coordination.</li>
+<li><code>@offlinejs/conflicts</code>: CRDT-friendly merge helpers.</li>
+<li><code>@offlinejs/sync-protocol</code>: reference push/pull protocol envelopes and handlers.</li>
+<li><code>@offlinejs/benchmarks</code>: 100k-record benchmark utilities.</li>
+</ul>
+<h2>Example composition</h2><p><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
+import { createAuthTransport } from &quot;@offlinejs/auth&quot;;
+import { createBroadcastCoordination, coordinationPlugin } from &quot;@offlinejs/coordination&quot;;
+import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from &quot;@offlinejs/encryption&quot;;
+import { createFetchTransport } from &quot;@offlinejs/network&quot;;
+import { backgroundSyncPlugin } from &quot;@offlinejs/service-worker&quot;;
+import { createIndexedDBStorage } from &quot;@offlinejs/storage-indexeddb&quot;;
+import { createValidatedStorage, createRequiredFieldsValidator } from &quot;@offlinejs/validation&quot;;
+
+const baseStorage = createIndexedDBStorage({ databaseName: &quot;app&quot; });
+const codec = await createWebCryptoAesGcmCodec(key);
+const storage = createValidatedStorage(createJsonEncryptionStorage(baseStorage, codec), {
+  todos: createRequiredFieldsValidator([&quot;title&quot;])
+});
+const transport = createAuthTransport(
+  createFetchTransport({ baseURL: &quot;https://api.example.com&quot;, timeoutMs: 10_000 }),
+  { tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;) }
+);
+
+const db = createOfflineDB({
+  storage,
+  transport,
+  plugins: [backgroundSyncPlugin(), coordinationPlugin(createBroadcastCoordination())]
+});</code></pre>
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>

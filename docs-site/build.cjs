@@ -1,10 +1,14 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+#!/usr/bin/env node
+/**
+ * Zero-dependency docs site generator.
+ * Uses only Node builtins so Vercel never needs package installs.
+ */
+const { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } = require("node:fs");
+const { dirname, join } = require("node:path");
 
-const root = dirname(fileURLToPath(import.meta.url));
+const root = __dirname;
 const workspace = join(root, "..");
-const output = join(root, "dist");
+const output = join(root, "out");
 const assets = join(root, "assets");
 
 const pages = [
@@ -23,22 +27,25 @@ const pages = [
 
 const navPages = pages.filter(([slug]) => slug !== "index");
 
-await rm(output, { recursive: true, force: true });
-await mkdir(output, { recursive: true });
-await cp(assets, join(output, "assets"), { recursive: true });
+function main() {
+  assertExists(assets, "docs-site/assets");
+  assertExists(join(workspace, "docs"), "docs/");
 
-const homepage = renderHome();
-await writeFile(join(output, "index.html"), homepage);
+  rmSync(output, { recursive: true, force: true });
+  mkdirSync(output, { recursive: true });
+  cpSync(assets, join(output, "assets"), { recursive: true });
 
-for (const [slug, source, title, kind] of pages) {
-  if (slug === "index") {
-    continue;
-  }
+  writeFileSync(join(output, "index.html"), renderHome(), "utf8");
 
-  let markdown = await readFile(join(workspace, source), "utf8");
+  for (const [slug, source, title] of pages) {
+    if (slug === "index") {
+      continue;
+    }
 
-  if (slug === "quick-start") {
-    markdown = `# Quick Start
+    let markdown = readFileSync(join(workspace, source), "utf8");
+
+    if (slug === "quick-start") {
+      markdown = `# Quick Start
 
 Install OfflineJS and start writing local-first data in minutes.
 
@@ -75,25 +82,41 @@ const open = await todos.find({ filters: { completed: false } });
 - [Sync Engine](sync.html)
 - [Plugins](plugins.html)
 `;
+    }
+
+    writeFileSync(join(output, `${slug}.html`), renderDoc(title, markdown, slug), "utf8");
   }
 
-  await writeFile(join(output, `${slug}.html`), renderDoc(title, markdown, slug));
+  writeFileSync(
+    join(output, "sitemap.json"),
+    JSON.stringify(
+      pages.map(([slug, , title]) => ({
+        slug,
+        title,
+        url: slug === "index" ? "/" : `/${slug}.html`
+      })),
+      null,
+      2
+    ),
+    "utf8"
+  );
+
+  writeFileSync(join(output, "robots.txt"), "User-agent: *\nAllow: /\nSitemap: /sitemap.json\n", "utf8");
+
+  // Local alias used by older scripts/docs.
+  const dist = join(root, "dist");
+  rmSync(dist, { recursive: true, force: true });
+  mkdirSync(dist, { recursive: true });
+  cpSync(output, dist, { recursive: true });
+
+  console.log(`Docs site built → ${output}`);
 }
 
-await writeFile(
-  join(output, "sitemap.json"),
-  JSON.stringify(
-    pages.map(([slug, , title]) => ({
-      slug,
-      title,
-      url: slug === "index" ? "/" : `/${slug}.html`
-    })),
-    null,
-    2
-  )
-);
-
-await writeFile(join(output, "robots.txt"), `User-agent: *\nAllow: /\nSitemap: /sitemap.json\n`);
+function assertExists(path, label) {
+  if (!existsSync(path)) {
+    throw new Error(`Missing required path for docs build: ${label} (${path})`);
+  }
+}
 
 function shell({ title, current, body }) {
   const nav = navPages
@@ -299,4 +322,11 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+try {
+  main();
+} catch (error) {
+  console.error("Docs build failed:", error instanceof Error ? error.message : error);
+  process.exit(1);
 }

@@ -1,0 +1,57 @@
+[
+  {
+    "slug": "index",
+    "title": "Home",
+    "url": "/"
+  },
+  {
+    "slug": "quick-start",
+    "title": "Quick Start",
+    "url": "/quick-start.html"
+  },
+  {
+    "slug": "api",
+    "title": "API",
+    "url": "/api.html"
+  },
+  {
+    "slug": "architecture",
+    "title": "Architecture",
+    "url": "/architecture.html"
+  },
+  {
+    "slug": "storage",
+    "title": "Storage",
+    "url": "/storage.html"
+  },
+  {
+    "slug": "sync",
+    "title": "Sync",
+    "url": "/sync.html"
+  },
+  {
+    "slug": "plugins",
+    "title": "Plugins",
+    "url": "/plugins.html"
+  },
+  {
+    "slug": "contracts",
+    "title": "Contracts",
+    "url": "/contracts.html"
+  },
+  {
+    "slug": "practices",
+    "title": "Practices",
+    "url": "/practices.html"
+  },
+  {
+    "slug": "roadmap",
+    "title": "Roadmap",
+    "url": "/roadmap.html"
+  },
+  {
+    "slug": "faq",
+    "title": "FAQ",
+    "url": "/faq.html"
+  }
+]

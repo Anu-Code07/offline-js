@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>Offline-first data layer · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <section class="hero">
+      <div class="hero-visual" aria-hidden="true">
+        <div class="orbit orbit-1"><span class="node"></span></div>
+        <div class="orbit orbit-2"><span class="node"></span></div>
+        <div class="orbit orbit-3"><span class="node"></span></div>
+      </div>
+      <div class="hero-inner">
+        <h1 class="brand-hero reveal">OfflineJS</h1>
+        <p class="hero-copy reveal">
+          The offline-first data layer for TypeScript apps that should keep working when the network disappears.
+        </p>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="quick-start.html">Start building</a>
+          <a class="button button-secondary" href="api.html">Read the API</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Why OfflineJS</p>
+        <h2 class="section-title reveal">Local writes first. Sync when ready.</h2>
+        <p class="section-copy reveal">
+          Stop hand-rolling fetch retries, IndexedDB wrappers, mutation queues, and conflict logic. OfflineJS turns that complexity into a calm collection API.
+        </p>
+        <div class="feature-strip">
+          <article class="feature reveal">
+            <h3>Optimistic by default</h3>
+            <p>UI updates immediately from durable local storage while mutations wait for reconnect.</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Queue with backoff</h3>
+            <p>Persistent mutation queues retry with priority, pause/resume, and exponential backoff.</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Pluggable everywhere</h3>
+            <p>Swap storage adapters, transports, plugins, and conflict strategies without changing your app API.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Install</p>
+        <h2 class="section-title reveal">Ship the first offline collection today.</h2>
+        <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
+        <pre class="code-panel reveal"><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb
+
+const db = createOfflineDB({
+  baseURL: "https://api.example.com",
+  storage: createIndexedDBStorage()
+});
+
+await db.collection("todos").create({ title: "Works offline" });</code></pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Docs</p>
+        <h2 class="section-title reveal">Explore the system.</h2>
+        <p class="section-copy reveal">Architecture, adapters, sync, plugins, contracts, and the roadmap—all in one place.</p>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="architecture.html">Architecture</a>
+          <a class="button button-secondary" href="storage.html">Storage</a>
+          <a class="button button-secondary" href="sync.html">Sync</a>
+          <a class="button button-secondary" href="roadmap.html">Roadmap</a>
+        </div>
+      </div>
+    </section>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>API · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>API Reference</h1><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database.</p><pre><code>const db = createOfflineDB({
+  baseURL: &quot;https://api.example.com&quot;,
+  storage,
+  sync: { conflictStrategy: &quot;lastWriteWins&quot; }
+});</code></pre><h2>Collections</h2><pre><code>const users = db.collection(&quot;users&quot;);
+
+await users.find({ limit: 20 });
+await users.findOne(id);
+await users.create({ name: &quot;Ada&quot; });
+await users.update(id, { name: &quot;Grace&quot; });
+await users.delete(id);
+await users.sync();
+const unsubscribe = users.subscribe((records) =&gt; {});</code></pre><h2>Events</h2><p>Available events are <code>sync:start</code>, <code>sync:end</code>, <code>offline</code>, <code>online</code>, <code>queue:add</code>,
+<code>queue:complete</code>, <code>conflict</code>, and <code>error</code>.</p><p><pre><code>db.on(&quot;queue:add&quot;, (mutation) =&gt; {
+  console.debug(&quot;queued&quot;, mutation);
+});</code></pre>
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+  </body>
+</html>
