@@ -3,6 +3,7 @@
   "private": true,
   "description": "Static OfflineJS documentation site (zero runtime dependencies).",
   "scripts": {
-    "build": "node build.cjs"
+    "build": "test -f out/index.html",
+    "docs:build": "node build.cjs"
   }
 }

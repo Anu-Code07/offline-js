@@ -4,30 +4,50 @@ Static documentation site for OfflineJS.
 
 ## Local development
 
+Regenerate the static export (writes `out/` + local `dist/`):
+
 ```bash
 pnpm docs:build
+# or from this folder:
+node build.cjs
+```
+
+Preview:
+
+```bash
 pnpm dlx serve docs-site/out
 ```
 
-`pnpm docs:build` writes the static site to `docs-site/out` (committed) and mirrors it to `docs-site/dist` (gitignored).
+## Vercel (failure-proof)
 
-## Vercel
+The site is **prebuilt** into `docs-site/out` and committed to git.
 
-Root `vercel.json` deploys the **prebuilt** `docs-site/out` folder:
+Vercel does **not** install packages and does **not** compile TypeScript. It only publishes `docs-site/out`.
 
-- Install: skipped
-- Build: verifies `docs-site/out` exists (no Node package installs)
-- Output: `docs-site/out`
+### Recommended project settings
 
-### Project settings checklist
+Use **one** of these setups (not a mix):
 
-In the Vercel project, keep these cleared/overridden values aligned with the repo:
+#### Option A — Root Directory = `.` (repo root)
 
-1. **Root Directory:** `.` (repository root)
-2. **Framework Preset:** Other
-3. **Install Command:** use `vercel.json` (do not force `pnpm install`)
-4. **Build Command:** use `vercel.json`
-5. **Output Directory:** `docs-site/out`
-6. Redeploy with **Clear cache** after changing these settings
+- Framework Preset: **Other**
+- Install Command: leave blank / use `vercel.json` (`true`)
+- Build Command: leave blank / use `vercel.json` (`true`)
+- Output Directory: `docs-site/out`
+- Clear Build Cache on redeploy
 
-When you change docs content, run `pnpm docs:build` and commit the updated `docs-site/out` files.
+#### Option B — Root Directory = `docs-site`
+
+- Framework Preset: **Other**
+- Install / Build: use `docs-site/vercel.json` (`true`)
+- Output Directory: `out`
+- Clear Build Cache on redeploy
+
+### After changing docs content
+
+```bash
+pnpm docs:build
+git add docs-site/out
+git commit -m "Update docs site"
+git push
+```

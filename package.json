@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "format": "prettier --check .",
     "docs:build": "node docs-site/build.cjs",
-    "vercel-build": "node docs-site/build.cjs",
+    "vercel-build": "test -f docs-site/out/index.html",
     "changeset": "changeset"
   },
   "devDependencies": {

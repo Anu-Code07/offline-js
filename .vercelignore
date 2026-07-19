@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+.git
+.turbo
+coverage
+dist
+**/dist
+packages
+examples
+*.tsbuildinfo
+**/*.test.ts
+docs-site/dist
+.cursor
+agent-tools
