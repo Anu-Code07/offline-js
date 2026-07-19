@@ -381,7 +381,9 @@ pnpm docs:build
 # or: node docs-site/build.cjs
 ```
 
-Static output is written to `docs-site/out` (committed for Vercel) and mirrored to `docs-site/dist` locally. Vercel deploys the prebuilt `docs-site/out` folder with no package install.
+Static HTML is written to `docs-site/out` (committed) and mirrored to `docs-site/dist` locally.
+
+Vercel publishes `docs-site/out` with install/build commands set to `true` (no pnpm, no compile). See [`docs-site/README.md`](./docs-site/README.md) for the exact Vercel project settings.
 
 ## Tips for production apps
 
