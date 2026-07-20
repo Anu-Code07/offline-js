@@ -1,7 +1,7 @@
 {
   "name": "@offlinejs/react",
   "version": "0.1.0",
-  "description": "React integration package placeholder for OfflineJS.",
+  "description": "React hooks and provider for OfflineJS collections and network status.",
   "type": "module",
   "sideEffects": false,
   "exports": {

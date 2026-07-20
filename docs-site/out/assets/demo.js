@@ -100,6 +100,44 @@ var applyQuery = (records, query = {}) => {
   return sorted.slice(offset, offset + limit);
 };
 var countQuery = (records, query = {}) => records.filter((record) => matchesQuery(record, query)).length;
+var serializeCompoundIndexValue = (values) => JSON.stringify(values.map((value) => value ?? null));
+var readIndexFields = (record, fields) => fields.map((field) => record[String(field)]);
+var getEqualityFilterLookups = (filters) => {
+  if (!filters) {
+    return [];
+  }
+  const lookups = [];
+  for (const [field, expected] of Object.entries(filters)) {
+    if (expected === void 0) {
+      continue;
+    }
+    if (Array.isArray(expected) || expected === null || typeof expected !== "object") {
+      lookups.push({ field, value: expected });
+      continue;
+    }
+    if ("eq" in expected && expected.eq !== void 0) {
+      lookups.push({ field, value: expected.eq });
+    }
+  }
+  return lookups;
+};
+var findMatchingIndex = (indexes, lookups) => {
+  if (indexes.length === 0 || lookups.length === 0) {
+    return null;
+  }
+  const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
+  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
+  for (const index of ranked) {
+    const fields = index.fields.map(String);
+    if (fields.every((field) => lookupByField.has(field))) {
+      return {
+        index,
+        values: fields.map((field) => lookupByField.get(field))
+      };
+    }
+  }
+  return null;
+};
 var sortRecords = (records, query) => {
   if (!query.orderBy) {
     return [...records];
@@ -401,6 +439,8 @@ var MemoryStorageAdapter = class {
   };
   records = /* @__PURE__ */ new Map();
   indexes = /* @__PURE__ */ new Map();
+  /** collection → indexName → serializedValue → record ids */
+  secondary = /* @__PURE__ */ new Map();
   appliedMigrations = /* @__PURE__ */ new Set();
   constructor(options = {}) {
     this.name = options.name ?? "memory";
@@ -413,33 +453,54 @@ var MemoryStorageAdapter = class {
     return record ? clone(record) : null;
   }
   async set(collection, value) {
+    const previous = this.records.get(collection)?.get(value.id);
+    if (previous) {
+      this.unindexRecord(collection, previous);
+    }
+    this.assertUniqueIndexes(collection, value, previous?.id);
     this.ensureCollection(collection).set(value.id, clone(value));
+    this.indexRecord(collection, value);
   }
   async delete(collection, id) {
+    const previous = this.records.get(collection)?.get(id);
+    if (previous) {
+      this.unindexRecord(collection, previous);
+    }
     this.records.get(collection)?.delete(id);
   }
   async find(collection, query) {
-    const records = [...this.records.get(collection)?.values() ?? []].map(
-      (record) => clone(record)
-    );
+    const indexed = this.findViaIndex(collection, query);
+    const records = indexed ?? [...this.records.get(collection)?.values() ?? []].map((record) => clone(record));
     return applyQuery(records, query);
   }
   async clear(collection) {
     if (collection) {
       this.records.delete(collection);
       this.indexes.delete(collection);
+      this.secondary.delete(collection);
       return;
     }
     this.records.clear();
     this.indexes.clear();
+    this.secondary.clear();
   }
   async createIndex(definition) {
+    const normalized = clone(definition);
     const collectionIndexes = this.indexes.get(definition.collection) ?? /* @__PURE__ */ new Map();
-    collectionIndexes.set(definition.name, clone(definition));
+    collectionIndexes.set(definition.name, normalized);
     this.indexes.set(definition.collection, collectionIndexes);
+    const bucket = /* @__PURE__ */ new Map();
+    const collectionSecondary = this.secondary.get(definition.collection) ?? /* @__PURE__ */ new Map();
+    collectionSecondary.set(definition.name, bucket);
+    this.secondary.set(definition.collection, collectionSecondary);
+    for (const record of this.records.get(definition.collection)?.values() ?? []) {
+      this.assertUniqueIndexes(definition.collection, record);
+      this.addToSecondary(definition.collection, normalized, record);
+    }
   }
   async dropIndex(collection, name) {
     this.indexes.get(collection)?.delete(name);
+    this.secondary.get(collection)?.delete(name);
   }
   async listIndexes(collection) {
     if (collection) {
@@ -451,8 +512,20 @@ var MemoryStorageAdapter = class {
   }
   async transaction(scope, run) {
     const snapshot = /* @__PURE__ */ new Map();
+    const indexSnapshot = /* @__PURE__ */ new Map();
+    const secondarySnapshot = /* @__PURE__ */ new Map();
     for (const collection of scope) {
       snapshot.set(collection, new Map(this.records.get(collection) ?? []));
+      indexSnapshot.set(
+        collection,
+        new Map(
+          [...this.indexes.get(collection)?.entries() ?? []].map(([name, definition]) => [
+            name,
+            clone(definition)
+          ])
+        )
+      );
+      secondarySnapshot.set(collection, cloneSecondary(this.secondary.get(collection)));
     }
     try {
       return await run(this);
@@ -463,6 +536,18 @@ var MemoryStorageAdapter = class {
           this.records.set(collection, records);
         } else {
           this.records.delete(collection);
+        }
+        const indexes = indexSnapshot.get(collection);
+        if (indexes && indexes.size > 0) {
+          this.indexes.set(collection, indexes);
+        } else {
+          this.indexes.delete(collection);
+        }
+        const secondary = secondarySnapshot.get(collection);
+        if (secondary && secondary.size > 0) {
+          this.secondary.set(collection, secondary);
+        } else {
+          this.secondary.delete(collection);
         }
       }
       throw error;
@@ -479,6 +564,70 @@ var MemoryStorageAdapter = class {
       });
     }
   }
+  findViaIndex(collection, query) {
+    const definitions = [...this.indexes.get(collection)?.values() ?? []];
+    const match = findMatchingIndex(definitions, getEqualityFilterLookups(query?.filters));
+    if (!match) {
+      return null;
+    }
+    const valueKey = serializeCompoundIndexValue(match.values);
+    const ids = this.secondary.get(collection)?.get(match.index.name)?.get(valueKey);
+    if (!ids) {
+      return [];
+    }
+    const records = [];
+    for (const id of ids) {
+      const record = this.records.get(collection)?.get(id);
+      if (record) {
+        records.push(clone(record));
+      }
+    }
+    return records;
+  }
+  assertUniqueIndexes(collection, record, ignoreId) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      if (!definition.unique) {
+        continue;
+      }
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const ids = this.secondary.get(collection)?.get(definition.name)?.get(valueKey);
+      if (!ids) {
+        continue;
+      }
+      for (const id of ids) {
+        if (id !== record.id && id !== ignoreId) {
+          throw new Error(
+            `Unique index "${definition.name}" violated for ${collection}.${String(definition.fields[0])}`
+          );
+        }
+      }
+    }
+  }
+  indexRecord(collection, record) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      this.addToSecondary(collection, definition, record);
+    }
+  }
+  unindexRecord(collection, record) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = this.secondary.get(collection)?.get(definition.name)?.get(valueKey);
+      bucket?.delete(record.id);
+      if (bucket && bucket.size === 0) {
+        this.secondary.get(collection)?.get(definition.name)?.delete(valueKey);
+      }
+    }
+  }
+  addToSecondary(collection, definition, record) {
+    const collectionSecondary = this.secondary.get(collection) ?? /* @__PURE__ */ new Map();
+    const indexBucket = collectionSecondary.get(definition.name) ?? /* @__PURE__ */ new Map();
+    const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+    const ids = indexBucket.get(valueKey) ?? /* @__PURE__ */ new Set();
+    ids.add(record.id);
+    indexBucket.set(valueKey, ids);
+    collectionSecondary.set(definition.name, indexBucket);
+    this.secondary.set(collection, collectionSecondary);
+  }
   ensureCollection(collection) {
     const existing = this.records.get(collection);
     if (existing) {
@@ -488,6 +637,17 @@ var MemoryStorageAdapter = class {
     this.records.set(collection, records);
     return records;
   }
+};
+var cloneSecondary = (source) => {
+  const cloned = /* @__PURE__ */ new Map();
+  for (const [indexName, values] of source ?? []) {
+    const valueMap = /* @__PURE__ */ new Map();
+    for (const [valueKey, ids] of values) {
+      valueMap.set(valueKey, new Set(ids));
+    }
+    cloned.set(indexName, valueMap);
+  }
+  return cloned;
 };
 var createMemoryStorage = (options) => new MemoryStorageAdapter(options);
 
@@ -932,7 +1092,9 @@ var createOfflineDB = (options = {}) => new OfflineDatabase(options);
 // packages/storage-indexeddb/src/index.ts
 var STORE_NAME = "records";
 var INDEX_STORE_NAME = "indexes";
+var INDEX_ENTRIES_STORE = "index_entries";
 var COLLECTION_INDEX = "collection";
+var LOOKUP_INDEX = "lookup";
 var IndexedDBStorageAdapter = class {
   name = "indexeddb";
   contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
@@ -947,7 +1109,7 @@ var IndexedDBStorageAdapter = class {
   databasePromise;
   constructor(options = {}) {
     this.databaseName = options.databaseName ?? "offlinejs";
-    this.version = options.version ?? 1;
+    this.version = options.version ?? 2;
   }
   async get(collection, id) {
     const row = await this.request(
@@ -956,6 +1118,11 @@ var IndexedDBStorageAdapter = class {
     return row ? clone(row.value) : null;
   }
   async set(collection, value) {
+    const previous = await this.get(collection, value.id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
+    await this.assertUniqueIndexes(collection, value, previous?.id);
     const row = {
       collection,
       id: value.id,
@@ -963,21 +1130,25 @@ var IndexedDBStorageAdapter = class {
       value: clone(value)
     };
     await this.request(this.store("readwrite").put(row));
+    await this.writeIndexEntries(collection, value);
   }
   async delete(collection, id) {
+    const previous = await this.get(collection, id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
     await this.request(this.store("readwrite").delete(this.key(collection, id)));
   }
   async find(collection, query) {
-    const rows = await this.getCollectionRows(collection);
-    return applyQuery(
-      rows.map((row) => clone(row.value)),
-      query
-    );
+    const indexed = await this.findViaIndex(collection, query);
+    const records = indexed ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
+    return applyQuery(records, query);
   }
   async clear(collection) {
     if (!collection) {
       await this.request(this.store("readwrite").clear());
       await this.request(this.indexStore("readwrite").clear());
+      await this.request(this.entryStore("readwrite").clear());
       return;
     }
     const rows = await this.getCollectionRows(collection);
@@ -988,17 +1159,31 @@ var IndexedDBStorageAdapter = class {
         (index) => this.request(this.indexStore("readwrite").delete(this.indexKey(collection, index.name)))
       )
     );
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries.map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
   async createIndex(definition) {
+    const normalized = clone(definition);
     await this.request(
       this.indexStore("readwrite").put({
-        ...clone(definition),
+        ...normalized,
         id: this.indexKey(definition.collection, definition.name)
       })
     );
+    const rows = await this.getCollectionRows(definition.collection);
+    for (const row of rows) {
+      await this.assertUniqueIndexes(definition.collection, row.value);
+      await this.writeIndexEntries(definition.collection, row.value, [normalized]);
+    }
   }
   async dropIndex(collection, name) {
     await this.request(this.indexStore("readwrite").delete(this.indexKey(collection, name)));
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries.filter((entry) => entry.indexName === name).map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
   async listIndexes(collection) {
     const rows = await this.request(
@@ -1025,47 +1210,120 @@ var IndexedDBStorageAdapter = class {
       await this.set("__migrations", { id: migration.name, appliedAt: Date.now() });
     }
   }
+  async findViaIndex(collection, query) {
+    const match = findMatchingIndex(
+      await this.listIndexes(collection),
+      getEqualityFilterLookups(query?.filters)
+    );
+    if (!match) {
+      return null;
+    }
+    const lookup = this.lookupKey(
+      collection,
+      match.index.name,
+      serializeCompoundIndexValue(match.values)
+    );
+    const entries = await this.request(
+      this.entryLookup("readonly").getAll(lookup)
+    );
+    const records = [];
+    for (const entry of entries) {
+      const record = await this.get(collection, entry.recordId);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async assertUniqueIndexes(collection, record, ignoreId) {
+    for (const definition of await this.listIndexes(collection)) {
+      if (!definition.unique) {
+        continue;
+      }
+      const lookup = this.lookupKey(
+        collection,
+        definition.name,
+        serializeCompoundIndexValue(readIndexFields(record, definition.fields))
+      );
+      const entries = await this.request(
+        this.entryLookup("readonly").getAll(lookup)
+      );
+      if (entries.some((entry) => entry.recordId !== record.id && entry.recordId !== ignoreId)) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+  async writeIndexEntries(collection, record, definitions) {
+    const indexes = definitions ?? await this.listIndexes(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const entry = {
+        collection,
+        id: this.entryId(collection, definition.name, valueKey, record.id),
+        indexName: definition.name,
+        lookup: this.lookupKey(collection, definition.name, valueKey),
+        recordId: record.id,
+        valueKey
+      };
+      await this.request(this.entryStore("readwrite").put(entry));
+    }
+  }
+  async removeIndexEntries(collection, record) {
+    for (const definition of await this.listIndexes(collection)) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      await this.request(
+        this.entryStore("readwrite").delete(
+          this.entryId(collection, definition.name, valueKey, record.id)
+        )
+      );
+    }
+  }
   async getCollectionRows(collection) {
     const database = await this.database();
     const transaction = database.transaction(STORE_NAME, "readonly");
     const index = transaction.objectStore(STORE_NAME).index(COLLECTION_INDEX);
     return this.request(index.getAll(collection));
   }
+  async getEntriesForCollection(collection) {
+    const all = await this.request(this.entryStore("readonly").getAll());
+    return all.filter((entry) => entry.collection === collection);
+  }
   store(mode) {
-    const databasePromise = this.database();
-    const requestProxy = {
-      get: (key) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).get(key)
-      ),
-      put: (value) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).put(value)
-      ),
-      delete: (key) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).delete(key)
-      ),
-      clear: () => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).clear()
-      )
-    };
-    return requestProxy;
+    return this.objectStoreProxy(STORE_NAME, mode);
   }
   indexStore(mode) {
+    return this.objectStoreProxy(INDEX_STORE_NAME, mode);
+  }
+  entryStore(mode) {
+    return this.objectStoreProxy(INDEX_ENTRIES_STORE, mode);
+  }
+  entryLookup(mode) {
     const databasePromise = this.database();
-    const requestProxy = {
-      put: (value) => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).put(value)
-      ),
-      delete: (key) => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).delete(key)
-      ),
-      clear: () => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).clear()
-      ),
-      getAll: () => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).getAll()
+    return {
+      getAll: (lookup) => databasePromise.then(
+        (database) => database.transaction(INDEX_ENTRIES_STORE, mode).objectStore(INDEX_ENTRIES_STORE).index(LOOKUP_INDEX).getAll(lookup)
       )
     };
-    return requestProxy;
+  }
+  objectStoreProxy(storeName, mode) {
+    const databasePromise = this.database();
+    return {
+      get: (key) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).get(key)
+      ),
+      put: (value) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).put(value)
+      ),
+      delete: (key) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).delete(key)
+      ),
+      clear: () => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).clear()
+      ),
+      getAll: () => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).getAll()
+      )
+    };
   }
   async database() {
     if (this.databasePromise) {
@@ -1086,6 +1344,11 @@ var IndexedDBStorageAdapter = class {
         if (!database.objectStoreNames.contains(INDEX_STORE_NAME)) {
           database.createObjectStore(INDEX_STORE_NAME, { keyPath: "id" });
         }
+        if (!database.objectStoreNames.contains(INDEX_ENTRIES_STORE)) {
+          const entries = database.createObjectStore(INDEX_ENTRIES_STORE, { keyPath: "id" });
+          entries.createIndex(LOOKUP_INDEX, LOOKUP_INDEX, { unique: false });
+          entries.createIndex(COLLECTION_INDEX, COLLECTION_INDEX, { unique: false });
+        }
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB"));
@@ -1105,6 +1368,12 @@ var IndexedDBStorageAdapter = class {
   indexKey(collection, name) {
     return `${collection}:${name}`;
   }
+  lookupKey(collection, indexName, valueKey) {
+    return `${collection}:${indexName}:${valueKey}`;
+  }
+  entryId(collection, indexName, valueKey, recordId) {
+    return `${collection}:${indexName}:${valueKey}:${recordId}`;
+  }
 };
 var createIndexedDBStorage = (options) => new IndexedDBStorageAdapter(options);
 
@@ -1122,7 +1391,7 @@ var OPFSStorageAdapter = class {
   rootName;
   constructor(options = {}) {
     this.directory = options.directory;
-    this.rootName = options.rootName ?? "offlinejs";
+    this.rootName = options.rootName ?? options.rootDirectoryName ?? "offlinejs";
   }
   async get(collection, id) {
     try {
@@ -1133,31 +1402,37 @@ var OPFSStorageAdapter = class {
     }
   }
   async set(collection, value) {
+    const previous = await this.get(collection, value.id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
+    await this.assertUniqueIndexes(collection, value, previous?.id);
     const file = await this.file(collection, `${value.id}.json`, true);
     const writable = await file.createWritable();
     await writable.write(JSON.stringify(value));
     await writable.close();
     await this.updateManifest(collection, (ids) => [.../* @__PURE__ */ new Set([...ids, value.id])]);
+    await this.trackCollection(collection);
+    await this.writeIndexEntries(collection, value);
   }
   async delete(collection, id) {
+    const previous = await this.get(collection, id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
     await (await this.collectionDirectory(collection)).removeEntry(`${id}.json`);
     await this.updateManifest(collection, (ids) => ids.filter((value) => value !== id));
   }
   async find(collection, query) {
-    const manifest = await this.readManifest(collection);
-    const records = [];
-    for (const id of manifest.ids) {
-      const record = await this.get(collection, id);
-      if (record) {
-        records.push(record);
-      }
-    }
+    const indexed = await this.findViaIndex(collection, query);
+    const records = indexed ?? await this.loadAllRecords(collection);
     return applyQuery(records, query);
   }
   async clear(collection) {
     const root = await this.rootDirectory();
     if (collection) {
       await root.removeEntry(collection, { recursive: true });
+      await this.updateCollections((names) => names.filter((name) => name !== collection));
       return;
     }
     await root.removeEntry(this.rootName, { recursive: true });
@@ -1182,21 +1457,110 @@ var OPFSStorageAdapter = class {
     const nextIndexes = indexes.filter((index) => index.name !== definition.name);
     nextIndexes.push(definition);
     await this.writeIndexes(definition.collection, nextIndexes);
+    await this.trackCollection(definition.collection);
+    const data = await this.readIndexData(definition.collection);
+    data[definition.name] = {};
+    await this.writeIndexData(definition.collection, data);
+    for (const record of await this.loadAllRecords(definition.collection)) {
+      await this.assertUniqueIndexes(definition.collection, record);
+      await this.writeIndexEntries(definition.collection, record, [definition]);
+    }
   }
   async dropIndex(collection, name) {
     const indexes = (await this.listIndexes(collection)).filter((index) => index.name !== name);
     await this.writeIndexes(collection, indexes);
+    const data = await this.readIndexData(collection);
+    delete data[name];
+    await this.writeIndexData(collection, data);
   }
   async listIndexes(collection) {
-    if (!collection) {
-      return [];
+    if (collection) {
+      return this.readIndexes(collection);
     }
-    try {
-      const file = await this.file(collection, "__indexes.json");
-      return JSON.parse(await (await file.getFile()).text());
-    } catch {
-      return [];
+    const collections = await this.readCollections();
+    const indexes = [];
+    for (const name of collections) {
+      indexes.push(...await this.readIndexes(name));
     }
+    return indexes;
+  }
+  async findViaIndex(collection, query) {
+    const match = findMatchingIndex(
+      await this.listIndexes(collection),
+      getEqualityFilterLookups(query?.filters)
+    );
+    if (!match) {
+      return null;
+    }
+    const data = await this.readIndexData(collection);
+    const ids = data[match.index.name]?.[serializeCompoundIndexValue(match.values)] ?? [];
+    const records = [];
+    for (const id of ids) {
+      const record = await this.get(collection, id);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async loadAllRecords(collection) {
+    const manifest = await this.readManifest(collection);
+    const records = [];
+    for (const id of manifest.ids) {
+      const record = await this.get(collection, id);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async assertUniqueIndexes(collection, record, ignoreId) {
+    const data = await this.readIndexData(collection);
+    for (const definition of await this.listIndexes(collection)) {
+      if (!definition.unique) {
+        continue;
+      }
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const ids = data[definition.name]?.[valueKey] ?? [];
+      if (ids.some((id) => id !== record.id && id !== ignoreId)) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+  async writeIndexEntries(collection, record, definitions) {
+    const indexes = definitions ?? await this.listIndexes(collection);
+    if (indexes.length === 0) {
+      return;
+    }
+    const data = await this.readIndexData(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = data[definition.name] ?? {};
+      const ids = new Set(bucket[valueKey] ?? []);
+      ids.add(record.id);
+      bucket[valueKey] = [...ids];
+      data[definition.name] = bucket;
+    }
+    await this.writeIndexData(collection, data);
+  }
+  async removeIndexEntries(collection, record) {
+    const indexes = await this.listIndexes(collection);
+    if (indexes.length === 0) {
+      return;
+    }
+    const data = await this.readIndexData(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = data[definition.name];
+      if (!bucket?.[valueKey]) {
+        continue;
+      }
+      bucket[valueKey] = bucket[valueKey].filter((id) => id !== record.id);
+      if (bucket[valueKey].length === 0) {
+        delete bucket[valueKey];
+      }
+    }
+    await this.writeIndexData(collection, data);
   }
   async file(collection, name, create = false) {
     return (await this.collectionDirectory(collection)).getFileHandle(name, { create });
@@ -1223,10 +1587,52 @@ var OPFSStorageAdapter = class {
       return { ids: [] };
     }
   }
+  async readIndexes(collection) {
+    try {
+      const file = await this.file(collection, "__indexes.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return [];
+    }
+  }
   async writeIndexes(collection, indexes) {
     const file = await this.file(collection, "__indexes.json", true);
     const writable = await file.createWritable();
     await writable.write(JSON.stringify(indexes));
+    await writable.close();
+  }
+  async readIndexData(collection) {
+    try {
+      const file = await this.file(collection, "__index_data.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return {};
+    }
+  }
+  async writeIndexData(collection, data) {
+    const file = await this.file(collection, "__index_data.json", true);
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(data));
+    await writable.close();
+  }
+  async readCollections() {
+    try {
+      const root = await this.rootDirectory();
+      const file = await root.getFileHandle("__collections.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return [];
+    }
+  }
+  async trackCollection(collection) {
+    await this.updateCollections((names) => [.../* @__PURE__ */ new Set([...names, collection])]);
+  }
+  async updateCollections(update) {
+    const names = update(await this.readCollections());
+    const root = await this.rootDirectory();
+    const file = await root.getFileHandle("__collections.json", { create: true });
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(names));
     await writable.close();
   }
   async updateManifest(collection, update) {

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMemoryStorage } from "@offlinejs/storage-memory";
-import type { EventBus, OfflineEvents } from "@offlinejs/types";
+import type { EventBus, IndexableStorageAdapter, OfflineEvents } from "@offlinejs/types";
 import {
   assertValid,
+  composeValidators,
   createRequiredFieldsValidator,
+  createTypeValidator,
   createValidatedStorage,
   OfflineValidationError,
   validationPlugin
@@ -26,6 +28,40 @@ describe("validation", () => {
     await storage.set("users", { id: "1", name: "Ada" });
 
     await expect(storage.get("users", "1")).resolves.toEqual({ id: "1", name: "Ada" });
+  });
+
+  it("composes validators and forwards index APIs", async () => {
+    const memory = createMemoryStorage();
+    const storage: IndexableStorageAdapter = createValidatedStorage(memory, {
+      users: composeValidators(
+        createRequiredFieldsValidator(["name"]),
+        createTypeValidator({ age: "number" })
+      )
+    });
+
+    await expect(storage.set("users", { id: "1", name: "Ada", age: "x" })).rejects.toThrow(
+      /type number/
+    );
+    await storage.createIndex!({
+      collection: "users",
+      fields: ["name"],
+      name: "users_name"
+    });
+    await expect(storage.listIndexes!("users")).resolves.toEqual([
+      { collection: "users", fields: ["name"], name: "users_name" }
+    ]);
+  });
+
+  it("validates writes inside transactions", async () => {
+    const storage = createValidatedStorage(createMemoryStorage(), {
+      users: createRequiredFieldsValidator(["name"])
+    });
+
+    await expect(
+      storage.transaction(["users"], async (store) => {
+        await store.set("users", { id: "1" });
+      })
+    ).rejects.toBeInstanceOf(OfflineValidationError);
   });
 
   it("delegates reads, deletes, clears, transactions, and migrations", async () => {

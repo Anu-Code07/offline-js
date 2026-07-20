@@ -51,4 +51,23 @@ describe("IndexedDBStorageAdapter", () => {
       "IndexedDB is not available"
     );
   });
+
+  it("uses secondary indexes for equality filters and enforces uniqueness", async () => {
+    const storage = createIndexedDBStorage({ databaseName: `index-${Date.now()}` });
+    await storage.set("users", { id: "1", email: "ada@example.com", name: "Ada" });
+    await storage.set("users", { id: "2", email: "grace@example.com", name: "Grace" });
+    await storage.createIndex({
+      collection: "users",
+      fields: ["email"],
+      name: "users_email",
+      unique: true
+    });
+
+    await expect(
+      storage.find("users", { filters: { email: "grace@example.com" } })
+    ).resolves.toEqual([{ id: "2", email: "grace@example.com", name: "Grace" }]);
+    await expect(
+      storage.set("users", { id: "3", email: "ada@example.com", name: "Dup" })
+    ).rejects.toThrow(/Unique index/);
+  });
 });

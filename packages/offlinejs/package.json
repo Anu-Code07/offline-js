@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@offlinejs/auth": "workspace:*",
+    "@offlinejs/benchmarks": "workspace:*",
     "@offlinejs/conflicts": "workspace:*",
     "@offlinejs/coordination": "workspace:*",
     "@offlinejs/core": "workspace:*",

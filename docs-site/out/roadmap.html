@@ -30,24 +30,31 @@
       <article class="content reveal">
         <h1>Roadmap Implementation</h1><p>This document maps the v0.2 through v0.8 roadmap to the packages available in the workspace.
 These are production-facing foundations: APIs are typed, framework-independent where possible,
-and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin and worker handler helpers.</li>
-<li>Adapter-level indexes: <code>createIndex</code>, <code>dropIndex</code>, and <code>listIndexes</code> on indexable adapters.</li>
-<li><code>@offlinejs/network</code>: middleware and timeout-aware fetch transport.</li>
-<li><code>@offlinejs/react</code>: <code>useOfflineCollection</code> and <code>useOfflineRecords</code> built on</li>
-</ul>  <code>useSyncExternalStore</code>.</p><h2>v0.3</h2><ul><li><code>@offlinejs/validation</code>: validator helpers and validated storage wrapper.</li>
-<li><code>@offlinejs/encryption</code>: encrypted JSON storage wrapper and WebCrypto AES-GCM codec factory.</li>
-<li><code>@offlinejs/auth</code>: auth transport wrapper and plugin pattern.</li>
-<li><code>@offlinejs/next</code>: cache tag and server-action sync helpers.</li>
-</ul>
-<h2>v0.5</h2><ul><li><code>@offlinejs/storage-sqlite</code>: SQLite adapter over a pluggable async SQL driver.</li>
-<li><code>@offlinejs/storage-opfs</code>: Origin Private File System adapter for large browser datasets.</li>
-<li><code>@offlinejs/worker-sync</code>: worker message protocol and runtime helpers.</li>
+and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin, SW registration helper, and tag-aware</li>
+</ul>  worker handler helpers.
+<ul><li>Adapter-level indexes: <code>createIndex</code>, <code>dropIndex</code>, and <code>listIndexes</code> on indexable adapters,</li>
+</ul>  with equality-filter acceleration and unique constraints (memory, IndexedDB, SQLite, OPFS).
+<ul><li><code>@offlinejs/network</code>: middleware and timeout-aware fetch transport.</li>
+<li><code>@offlinejs/react</code>: <code>useOfflineCollection</code>, <code>useOfflineRecords</code>, <code>OfflineProvider</code>,</li>
+</ul>  <code>useOfflineDB</code>, and <code>useOfflineStatus</code> built on <code>useSyncExternalStore</code>.</p><h2>v0.3</h2><ul><li><code>@offlinejs/validation</code>: validator helpers (<code>required</code>, <code>type</code>, <code>compose</code>) and validated</li>
+</ul>  storage wrapper with index forwarding + transaction validation.
+<ul><li><code>@offlinejs/encryption</code>: encrypted JSON storage wrapper, WebCrypto AES-GCM codec factory,</li>
+</ul>  and key helper — indexes forward through the wrapper.
+<ul><li><code>@offlinejs/auth</code>: auth transport wrapper with 401 refresh/retry and plugin pattern.</li>
+<li><code>@offlinejs/next</code>: cache tag helpers, <code>revalidateTag</code> bridge, and server-action sync helpers</li>
+</ul>  (bound or unbound collection).</p><h2>v0.5</h2><ul><li><code>@offlinejs/storage-sqlite</code>: SQLite adapter over a pluggable async SQL driver with SQL</li>
+</ul>  secondary index entries.
+<ul><li><code>@offlinejs/storage-opfs</code>: Origin Private File System adapter for large browser datasets</li>
+</ul>  with secondary index data files.
+<ul><li><code>@offlinejs/worker-sync</code>: worker message protocol, runtime helpers, and attach helper.</li>
 <li><code>@offlinejs/devtools-ui</code>: framework-free event timeline renderer.</li>
 </ul>
-<h2>v0.8</h2><ul><li><code>@offlinejs/coordination</code>: BroadcastChannel-based multi-tab coordination.</li>
-<li><code>@offlinejs/conflicts</code>: CRDT-friendly merge helpers.</li>
-<li><code>@offlinejs/sync-protocol</code>: reference push/pull protocol envelopes and handlers.</li>
-<li><code>@offlinejs/benchmarks</code>: 100k-record benchmark utilities.</li>
+<h2>v0.8</h2><ul><li><code>@offlinejs/coordination</code>: BroadcastChannel-based multi-tab coordination with leader</li>
+</ul>  election and debounced sync.
+<ul><li><code>@offlinejs/conflicts</code>: CRDT-friendly merge helpers (counters, sets, OR-Map, tombstones).</li>
+<li><code>@offlinejs/sync-protocol</code>: reference push/pull protocol envelopes and handlers with</li>
+</ul>  conflict detection and pull cursors.
+<ul><li><code>@offlinejs/benchmarks</code>: 100k-record write/find/indexed-find benchmark utilities.</li>
 </ul>
 <h2>Example composition</h2><p>Compose packages around <code>@offlinejs/core</code>. Start with storage + transport, then layer plugins.</p><h3>Browser production stack</h3><p>Validation + encryption + auth + background sync + multi-tab coordination:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
 import { createAuthTransport } from &quot;@offlinejs/auth&quot;;
@@ -65,7 +72,7 @@ const baseStorage = createIndexedDBStorage({ databaseName: &quot;app&quot; });
 await baseStorage.createIndex?.({
   collection: &quot;todos&quot;,
   name: &quot;byCompleted&quot;,
-  keyPath: &quot;completed&quot;
+  fields: [&quot;completed&quot;]
 });
 
 const key = await crypto.subtle.generateKey({ name: &quot;AES-GCM&quot;, length: 256 }, true, [
@@ -84,7 +91,8 @@ const transport = createAuthTransport(
     timeoutMs: 10_000
   }),
   {
-    tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;)
+    tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;),
+    refreshToken: async () =&gt; localStorage.getItem(&quot;refreshToken&quot;)
   }
 );
 
@@ -103,13 +111,14 @@ const db = createOfflineDB({
 });
 
 const todos = db.collection(&quot;todos&quot;);
-await todos.create({ title: &quot;Works offline&quot;, completed: false });</code></pre><h3>React UI on top of the same DB</h3><pre><code>import { useOfflineCollection } from &quot;@offlinejs/react&quot;;
+await todos.create({ title: &quot;Works offline&quot;, completed: false });</code></pre><h3>React UI on top of the same DB</h3><pre><code>import { OfflineProvider, useOfflineCollection, useOfflineStatus } from &quot;@offlinejs/react&quot;;
 
 function TodoList({ todos }) {
   const { records, create, update, delete: remove } = useOfflineCollection(todos);
+  const { online } = useOfflineStatus();
 
   return (
-    &lt;ul&gt;
+    &lt;ul data-online={online}&gt;
       {records.map((todo) =&gt; (
         &lt;li key={todo.id}&gt;
           &lt;button onClick={() =&gt; update(todo.id, { completed: !todo.completed })}&gt;
@@ -120,6 +129,14 @@ function TodoList({ todos }) {
       ))}
       &lt;button onClick={() =&gt; create({ title: &quot;New todo&quot;, completed: false })}&gt;Add&lt;/button&gt;
     &lt;/ul&gt;
+  );
+}
+
+export function App({ db, todos }) {
+  return (
+    &lt;OfflineProvider db={db}&gt;
+      &lt;TodoList todos={todos} /&gt;
+    &lt;/OfflineProvider&gt;
   );
 }</code></pre><h3>Devtools timeline</h3><pre><code>import { createDevtoolsController } from &quot;@offlinejs/devtools-ui&quot;;
 
@@ -134,15 +151,17 @@ const db = createOfflineDB({
   storage,
   transport,
   plugins: [createWorkerSyncPlugin(worker)]
-});</code></pre><h3>Next.js cache tags + server action sync</h3><pre><code>import { createServerActionSync, offlineCacheTag } from &quot;@offlinejs/next&quot;;
+});</code></pre><h3>Next.js cache tags + server action sync</h3><pre><code>import { createCacheTagRevalidator, createServerActionSync, offlineCacheTag } from &quot;@offlinejs/next&quot;;
 
 export const syncTodos = createServerActionSync(db, &quot;todos&quot;);
 
-export const todoTag = (id: string) =&gt; offlineCacheTag(&quot;todos&quot;, id);</code></pre><h3>Large datasets (OPFS or SQLite)</h3><pre><code>import { createOPFSStorage } from &quot;@offlinejs/storage-opfs&quot;;
+export const todoTag = (id: string) =&gt; offlineCacheTag(&quot;todos&quot;, id);
+
+export const cache = createCacheTagRevalidator(revalidateTag);</code></pre><h3>Large datasets (OPFS or SQLite)</h3><pre><code>import { createOPFSStorage } from &quot;@offlinejs/storage-opfs&quot;;
 // or: import { createSQLiteStorage } from &quot;@offlinejs/storage-sqlite&quot;;
 
 const db = createOfflineDB({
-  storage: createOPFSStorage({ rootDirectoryName: &quot;offlinejs&quot; }),
+  storage: createOPFSStorage({ rootName: &quot;offlinejs&quot; }),
   transport
 });</code></pre><h3>Server sync protocol reference</h3><p>Use <code>@offlinejs/sync-protocol</code> on the API side to speak the same push/pull envelopes the client expects:</p><pre><code>import { handlePull, handlePush } from &quot;@offlinejs/sync-protocol&quot;;
 

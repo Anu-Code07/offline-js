@@ -1,5 +1,6 @@
 import type {
   EntityRecord,
+  QueuedMutation,
   SyncProtocolMutation,
   SyncProtocolPullRequest,
   SyncProtocolPullResponse,
@@ -43,18 +44,42 @@ export const handlePush = async <TRecord extends EntityRecord>(
 ): Promise<SyncProtocolPushResponse<TRecord>> => {
   const accepted: string[] = [];
   const rejected: Array<{ id: string; reason: string }> = [];
+  const conflicts: SyncProtocolPushResponse<TRecord>["conflicts"] = [];
 
   for (const mutation of request.mutations) {
     try {
       if (mutation.operation === "delete") {
         await store.delete(mutation.collection, mutation.recordId);
-      } else if (mutation.payload) {
-        await store.set(mutation.collection, {
-          ...(mutation.payload as TRecord),
-          id: mutation.recordId
-        });
+        accepted.push(mutation.id);
+        continue;
       }
 
+      if (!mutation.payload) {
+        rejected.push({ id: mutation.id, reason: "Missing mutation payload" });
+        continue;
+      }
+
+      const existing = await store.get(mutation.collection, mutation.recordId);
+      const nextRecord = {
+        ...(mutation.payload as TRecord),
+        id: mutation.recordId
+      };
+
+      if (mutation.operation === "create" && existing) {
+        conflicts.push(toConflict(mutation, nextRecord, existing));
+        continue;
+      }
+
+      if (
+        mutation.operation === "update" &&
+        existing &&
+        isVersionConflict(existing, mutation.payload as EntityRecord)
+      ) {
+        conflicts.push(toConflict(mutation, nextRecord, existing));
+        continue;
+      }
+
+      await store.set(mutation.collection, nextRecord);
       accepted.push(mutation.id);
     } catch (error) {
       rejected.push({
@@ -66,7 +91,7 @@ export const handlePush = async <TRecord extends EntityRecord>(
 
   return {
     accepted,
-    conflicts: [],
+    conflicts,
     rejected
   };
 };
@@ -74,9 +99,56 @@ export const handlePush = async <TRecord extends EntityRecord>(
 export const handlePull = async <TRecord extends EntityRecord>(
   store: SyncProtocolStore<TRecord>,
   request: SyncProtocolPullRequest
-): Promise<SyncProtocolPullResponse<TRecord>> => ({
-  records: await store.list(request.collection, {
+): Promise<SyncProtocolPullResponse<TRecord>> => {
+  const records = await store.list(request.collection, {
     ...(request.limit === undefined ? {} : { limit: request.limit }),
     ...(request.since === undefined ? {} : { since: request.since })
-  })
+  });
+  const last = records[records.length - 1];
+  const cursor =
+    last && (last.updatedAt !== undefined || last.version !== undefined || last.id)
+      ? String(last.updatedAt ?? last.version ?? last.id)
+      : undefined;
+
+  return {
+    records,
+    ...(cursor === undefined ? {} : { cursor })
+  };
+};
+
+const toConflict = <TRecord extends EntityRecord>(
+  mutation: SyncProtocolMutation<TRecord>,
+  client: TRecord,
+  server: TRecord
+): SyncProtocolPushResponse<TRecord>["conflicts"][number] => ({
+  client,
+  collection: mutation.collection,
+  mutation: toQueuedMutation(mutation, client),
+  server
 });
+
+const toQueuedMutation = <TRecord extends EntityRecord>(
+  mutation: SyncProtocolMutation<TRecord>,
+  client: TRecord
+): QueuedMutation<TRecord> => ({
+  id: mutation.id,
+  collection: mutation.collection,
+  createdAt: Date.now(),
+  operation: mutation.operation,
+  payload: mutation.payload ?? client,
+  priority: 0,
+  recordId: mutation.recordId,
+  retries: 0,
+  status: "processing"
+});
+
+const isVersionConflict = (server: EntityRecord, client: EntityRecord): boolean => {
+  const serverVersion = Number(server.updatedAt ?? server.version ?? Number.NaN);
+  const clientVersion = Number(client.updatedAt ?? client.version ?? Number.NaN);
+
+  if (Number.isNaN(serverVersion) || Number.isNaN(clientVersion)) {
+    return false;
+  }
+
+  return serverVersion > clientVersion;
+};

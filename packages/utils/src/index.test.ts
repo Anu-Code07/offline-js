@@ -8,8 +8,11 @@ import {
   countQuery,
   createId,
   delay,
+  findMatchingIndex,
+  getEqualityFilterLookups,
   isBrowser,
   normalizeError,
+  serializeCompoundIndexValue,
   toQueryString
 } from "./index";
 
@@ -70,5 +73,27 @@ describe("utils", () => {
       })
     ).toThrow("stable name");
     expect(() => assertSyncTransport({ request: undefined as never })).toThrow("request");
+  });
+
+  it("matches equality filters to the most specific secondary index", () => {
+    expect(getEqualityFilterLookups({ email: "a", age: { eq: 30 } })).toEqual([
+      { field: "email", value: "a" },
+      { field: "age", value: 30 }
+    ]);
+    expect(serializeCompoundIndexValue(["a", 30])).toBe(JSON.stringify(["a", 30]));
+
+    const match = findMatchingIndex(
+      [
+        { collection: "users", fields: ["email"], name: "by_email" },
+        { collection: "users", fields: ["email", "age"], name: "by_email_age" }
+      ],
+      [
+        { field: "email", value: "a" },
+        { field: "age", value: 30 }
+      ]
+    );
+
+    expect(match?.index.name).toBe("by_email_age");
+    expect(match?.values).toEqual(["a", 30]);
   });
 });

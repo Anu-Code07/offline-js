@@ -6,7 +6,7 @@ import {
   type StorageAdapter,
   type TransactionStore
 } from "@offlinejs/types";
-import { applyQuery } from "@offlinejs/utils";
+import { applyQuery, withIndexForwarding } from "@offlinejs/utils";
 
 interface EncryptedRecord extends EntityRecord {
   __offlinejsEncrypted: true;
@@ -16,34 +16,66 @@ interface EncryptedRecord extends EntityRecord {
 export const createJsonEncryptionStorage = (
   storage: StorageAdapter,
   codec: EncryptionCodec
-): StorageAdapter => ({
-  name: `${storage.name}:encrypted`,
-  contractVersion: STORAGE_ADAPTER_CONTRACT_VERSION,
-  ...(storage.capabilities ? { capabilities: storage.capabilities } : {}),
-  clear: (collection) => storage.clear(collection),
-  delete: (collection, id) => storage.delete(collection, id),
-  async find<TRecord extends EntityRecord>(
-    collection: string,
-    query?: QueryOptions<TRecord>
-  ): Promise<TRecord[]> {
-    const encryptedRecords = await storage.find<EncryptedRecord>(collection);
-    const records = await Promise.all(
-      encryptedRecords.map((record) => decryptRecord<TRecord>(record, codec))
-    );
+): StorageAdapter => {
+  const createEncryptedStore = (store: TransactionStore): TransactionStore => ({
+    clear: (collection) => store.clear(collection),
+    delete: (collection, id) => store.delete(collection, id),
+    async find<TRecord extends EntityRecord>(
+      collection: string,
+      query?: QueryOptions<TRecord>
+    ): Promise<TRecord[]> {
+      const encryptedRecords = await store.find<EncryptedRecord>(collection);
+      const records = await Promise.all(
+        encryptedRecords.map((record) => decryptRecord<TRecord>(record, codec))
+      );
+      return applyQuery(records, query);
+    },
+    async get<TRecord extends EntityRecord>(
+      collection: string,
+      id: string
+    ): Promise<TRecord | null> {
+      const record = await store.get<EncryptedRecord>(collection, id);
+      return record ? decryptRecord<TRecord>(record, codec) : null;
+    },
+    async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
+      await store.set(collection, await encryptRecord(value, codec));
+    }
+  });
 
-    return applyQuery(records, query);
-  },
-  async get<TRecord extends EntityRecord>(collection: string, id: string): Promise<TRecord | null> {
-    const record = await storage.get<EncryptedRecord>(collection, id);
-    return record ? decryptRecord<TRecord>(record, codec) : null;
-  },
-  async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
-    await storage.set(collection, await encryptRecord(value, codec));
-  },
-  transaction: <TValue>(scope: string[], run: (store: TransactionStore) => Promise<TValue>) =>
-    storage.transaction(scope, run),
-  ...(storage.migrate ? { migrate: storage.migrate.bind(storage) } : {})
-});
+  const wrapper: StorageAdapter = {
+    name: `${storage.name}:encrypted`,
+    contractVersion: STORAGE_ADAPTER_CONTRACT_VERSION,
+    ...(storage.capabilities ? { capabilities: storage.capabilities } : {}),
+    clear: (collection) => storage.clear(collection),
+    delete: (collection, id) => storage.delete(collection, id),
+    async find<TRecord extends EntityRecord>(
+      collection: string,
+      query?: QueryOptions<TRecord>
+    ): Promise<TRecord[]> {
+      const encryptedRecords = await storage.find<EncryptedRecord>(collection);
+      const records = await Promise.all(
+        encryptedRecords.map((record) => decryptRecord<TRecord>(record, codec))
+      );
+
+      return applyQuery(records, query);
+    },
+    async get<TRecord extends EntityRecord>(
+      collection: string,
+      id: string
+    ): Promise<TRecord | null> {
+      const record = await storage.get<EncryptedRecord>(collection, id);
+      return record ? decryptRecord<TRecord>(record, codec) : null;
+    },
+    async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
+      await storage.set(collection, await encryptRecord(value, codec));
+    },
+    transaction: <TValue>(scope: string[], run: (store: TransactionStore) => Promise<TValue>) =>
+      storage.transaction(scope, (store) => run(createEncryptedStore(store))),
+    ...(storage.migrate ? { migrate: storage.migrate.bind(storage) } : {})
+  };
+
+  return withIndexForwarding(wrapper, storage);
+};
 
 export const createWebCryptoAesGcmCodec = async (key: CryptoKey): Promise<EncryptionCodec> => ({
   async decrypt(value) {
@@ -65,6 +97,12 @@ export const createWebCryptoAesGcmCodec = async (key: CryptoKey): Promise<Encryp
     return output;
   }
 });
+
+export const generateAesGcmKey = (): Promise<CryptoKey> =>
+  globalThis.crypto.subtle.generateKey({ length: 256, name: "AES-GCM" }, true, [
+    "encrypt",
+    "decrypt"
+  ]);
 
 const encryptRecord = async <TRecord extends EntityRecord>(
   record: TRecord,

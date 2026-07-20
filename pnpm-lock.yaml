@@ -226,6 +226,9 @@ importers:
       '@offlinejs/auth':
         specifier: workspace:*
         version: link:../auth
+      '@offlinejs/benchmarks':
+        specifier: workspace:*
+        version: link:../benchmarks
       '@offlinejs/conflicts':
         specifier: workspace:*
         version: link:../conflicts

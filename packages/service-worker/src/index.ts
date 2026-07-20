@@ -11,6 +11,25 @@ export interface BackgroundSyncPluginOptions {
   syncTag?: string;
 }
 
+export interface RegisterServiceWorkerOptions {
+  options?: RegistrationOptions;
+  scope?: string;
+  scriptUrl: string;
+}
+
+export const registerOfflineServiceWorker = async (
+  options: RegisterServiceWorkerOptions
+): Promise<ServiceWorkerRegistration | null> => {
+  if (!globalThis.navigator?.serviceWorker) {
+    return null;
+  }
+
+  return globalThis.navigator.serviceWorker.register(options.scriptUrl, {
+    ...(options.scope ? { scope: options.scope } : {}),
+    ...options.options
+  });
+};
+
 export const backgroundSyncPlugin = (options: BackgroundSyncPluginOptions = {}): OfflinePlugin => ({
   name: "background-sync",
   setup({ db, events, network }) {
@@ -61,9 +80,18 @@ export const createWorkerSyncMessage = (
   type
 });
 
-export const createOfflineSyncWorkerHandler = (sync: () => Promise<void>) => {
+export const createOfflineSyncWorkerHandler = (
+  sync: () => Promise<void>,
+  options: { syncTag?: string } = {}
+) => {
+  const syncTag = options.syncTag ?? "offlinejs-sync";
+
   return async (event: SyncExtendableEvent): Promise<void> => {
-    if ("waitUntil" in event) {
+    if (event.tag && event.tag !== syncTag) {
+      return;
+    }
+
+    if ("waitUntil" in event && typeof event.waitUntil === "function") {
       event.waitUntil(sync());
       return;
     }
