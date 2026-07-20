@@ -256,15 +256,25 @@ For TTL / stale-while-revalidate **GET caching** (not the offline outbox), use h
 import { cachedJson, createIndexedDBHttpCache } from "@offlinejs/client";
 
 const store = createIndexedDBHttpCache();
-const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
+
+// cachedJson(url, fetchInit?, cacheOptions?)
+// Pass undefined for fetchInit when you don't need headers/method.
+const { data, fromCache, stale } = await cachedJson("/api/catalog", undefined, {
   store,
   ttlMs: 60_000,
   staleWhileRevalidateMs: 30_000
 });
 ```
 
-See [HTTP cache](cache.html) for stores, invalidation, and when to use OfflineDB vs `cachedJson`.
+With headers:
 
+```ts
+await cachedJson("/api/catalog", {
+  headers: { Authorization: `Bearer ${token}` }
+}, { store, ttlMs: 60_000 });
+```
+
+See [HTTP cache](cache.html) for the full how-to (arguments, stores, invalidation).
 ## Next steps
 
 - [Live demo](demo.html) — device → outbox → remote with DevTools
