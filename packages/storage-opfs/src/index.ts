@@ -42,6 +42,7 @@ export class OPFSStorageAdapter implements IndexableStorageAdapter {
   readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   readonly capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "durable",
     transactions: "best-effort"
@@ -65,20 +66,51 @@ export class OPFSStorageAdapter implements IndexableStorageAdapter {
   }
 
   async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
-    const previous = await this.get(collection, value.id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+
+  async setMany<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void> {
+    if (values.length === 0) {
+      return;
     }
 
-    await this.assertUniqueIndexes(collection, value, previous?.id);
+    const byId = new Map<string, TRecord>();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
 
-    const file = await this.file(collection, `${value.id}.json`, true);
-    const writable = await file.createWritable();
-    await writable.write(JSON.stringify(value));
-    await writable.close();
-    await this.updateManifest(collection, (ids) => [...new Set([...ids, value.id])]);
+    const previousById = new Map<string, EntityRecord>();
+    for (const record of records) {
+      const previous = await this.get(collection, record.id);
+      if (previous) {
+        previousById.set(record.id, previous);
+      }
+      await this.assertUniqueIndexes(collection, record, previous?.id);
+    }
+
+    const indexes = await this.listIndexes(collection);
+    let indexData = await this.readIndexData(collection);
+    const manifest = await this.readManifest(collection);
+    const ids = new Set(manifest.ids);
+
+    for (const record of records) {
+      const previous = previousById.get(record.id);
+      if (previous) {
+        indexData = this.removeIndexEntriesInMemory(indexData, indexes, previous);
+      }
+
+      const file = await this.file(collection, `${record.id}.json`, true);
+      const writable = await file.createWritable();
+      await writable.write(JSON.stringify(record));
+      await writable.close();
+      ids.add(record.id);
+      indexData = this.addIndexEntriesInMemory(indexData, indexes, record);
+    }
+
+    await this.writeManifest(collection, { ids: [...ids] });
     await this.trackCollection(collection);
-    await this.writeIndexEntries(collection, value);
+    await this.writeIndexData(collection, indexData);
   }
 
   async delete(collection: string, id: string): Promise<void> {
@@ -249,17 +281,7 @@ export class OPFSStorageAdapter implements IndexableStorageAdapter {
       return;
     }
 
-    const data = await this.readIndexData(collection);
-
-    for (const definition of indexes) {
-      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
-      const bucket = data[definition.name] ?? {};
-      const ids = new Set(bucket[valueKey] ?? []);
-      ids.add(record.id);
-      bucket[valueKey] = [...ids];
-      data[definition.name] = bucket;
-    }
-
+    const data = this.addIndexEntriesInMemory(await this.readIndexData(collection), indexes, record);
     await this.writeIndexData(collection, data);
   }
 
@@ -269,22 +291,57 @@ export class OPFSStorageAdapter implements IndexableStorageAdapter {
       return;
     }
 
-    const data = await this.readIndexData(collection);
+    const data = this.removeIndexEntriesInMemory(
+      await this.readIndexData(collection),
+      indexes,
+      record
+    );
+    await this.writeIndexData(collection, data);
+  }
 
+  private addIndexEntriesInMemory(
+    data: IndexDataFile,
+    indexes: IndexDefinition[],
+    record: EntityRecord
+  ): IndexDataFile {
+    const next = { ...data };
     for (const definition of indexes) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
-      const bucket = data[definition.name];
-      if (!bucket?.[valueKey]) {
+      const bucket = { ...(next[definition.name] ?? {}) };
+      const ids = new Set(bucket[valueKey] ?? []);
+      ids.add(record.id);
+      bucket[valueKey] = [...ids];
+      next[definition.name] = bucket;
+    }
+    return next;
+  }
+
+  private removeIndexEntriesInMemory(
+    data: IndexDataFile,
+    indexes: IndexDefinition[],
+    record: EntityRecord
+  ): IndexDataFile {
+    const next = { ...data };
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = { ...(next[definition.name] ?? {}) };
+      if (!bucket[valueKey]) {
         continue;
       }
-
       bucket[valueKey] = bucket[valueKey].filter((id) => id !== record.id);
       if (bucket[valueKey].length === 0) {
         delete bucket[valueKey];
       }
+      next[definition.name] = bucket;
     }
+    return next;
+  }
 
-    await this.writeIndexData(collection, data);
+  private async writeManifest(collection: string, manifest: { ids: string[] }): Promise<void> {
+    const file = await this.file(collection, "__manifest.json", true);
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(manifest));
+    await writable.close();
   }
 
   private async file(collection: string, name: string, create = false): Promise<MinimalFileHandle> {

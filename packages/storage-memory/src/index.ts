@@ -28,6 +28,7 @@ export class MemoryStorageAdapter implements IndexableStorageAdapter {
   readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   readonly capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "ephemeral",
     transactions: "atomic"
@@ -53,14 +54,34 @@ export class MemoryStorageAdapter implements IndexableStorageAdapter {
   }
 
   async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
-    const previous = this.records.get(collection)?.get(value.id);
-    if (previous) {
-      this.unindexRecord(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+
+  async setMany<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void> {
+    if (values.length === 0) {
+      return;
     }
 
-    this.assertUniqueIndexes(collection, value, previous?.id);
-    this.ensureCollection(collection).set(value.id, clone(value));
-    this.indexRecord(collection, value);
+    const byId = new Map<string, TRecord>();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
+
+    // Validate first so a unique violation never leaves a partial batch applied.
+    for (const value of records) {
+      const previous = this.records.get(collection)?.get(value.id);
+      this.assertUniqueIndexes(collection, value, previous?.id);
+    }
+
+    for (const value of records) {
+      const previous = this.records.get(collection)?.get(value.id);
+      if (previous) {
+        this.unindexRecord(collection, previous);
+      }
+      this.ensureCollection(collection).set(value.id, clone(value));
+      this.indexRecord(collection, value);
+    }
   }
 
   async delete(collection: string, id: string): Promise<void> {

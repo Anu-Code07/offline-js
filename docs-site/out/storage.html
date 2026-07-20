@@ -19,30 +19,37 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html" aria-current="page">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="plugins.html">Plugins</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html" aria-current="page">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html" aria-current="page">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html" aria-current="page">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>Storage Adapters</h1><p>Adapters implement <code>StorageAdapter</code> from <code>@offlinejs/types</code>.</p><pre><code>interface StorageAdapter {
   get(collection, id);
   set(collection, value);
+  setMany?(collection, values); // optional bulk write
   delete(collection, id);
   find(collection, query);
   clear(collection?);
   transaction(scope, run);
-}</code></pre><p>Adapters that support secondary index metadata also implement:</p><pre><code>interface IndexableStorageAdapter extends StorageAdapter {
+}</code></pre><p>Prefer <code>setMany</code> for ingest and sync pull when the adapter sets <code>capabilities.bulkWrites</code>.
+IndexedDB, memory, SQLite, and OPFS implement it — one durable batch instead of N transactions.
+Adapters that support secondary index metadata also implement:</p><pre><code>interface IndexableStorageAdapter extends StorageAdapter {
   createIndex(definition);
   dropIndex(collection, name);
   listIndexes(collection?);
 }</code></pre><h2>Memory</h2><p>Use <code>@offlinejs/storage-memory</code> for tests, Node.js, SSR fallback behavior, and demos.</p><h2>IndexedDB</h2><p>Use <code>@offlinejs/storage-indexeddb</code> for durable browser persistence. It stores records in one
 object store with a collection index, which keeps dynamic collections possible without schema
-upgrades for every collection.</p><h2>SQLite</h2><p>Use <code>@offlinejs/storage-sqlite</code> with a pluggable async SQL driver. This keeps the adapter usable
-with Electron, Expo, Bun, server-side SQLite wrappers, and edge runtimes.</p><h2>OPFS</h2><p>Use <code>@offlinejs/storage-opfs</code> for large browser datasets backed by the Origin Private File System.</p><h2>Future adapters</h2><p>LocalStorage and other platform-specific adapters can be added without changing <code>@offlinejs/core</code>.
+upgrades for every collection.</p><h2>SQLite</h2><p>Use <code>@offlinejs/storage-sqlite</code> with a pluggable async SQL driver. For Node production:</p><pre><code>import Database from &quot;better-sqlite3&quot;;
+import { createBetterSqlite3DriverAsync, createSQLiteStorage } from &quot;@offlinejs/storage-sqlite&quot;;
+
+const storage = createSQLiteStorage({
+  driver: createBetterSqlite3DriverAsync(new Database(&quot;offline.db&quot;))
+});</code></pre><p>Equality filters + order/limit can push into SQL (<code>json_extract</code>) when the query is engine-safe.</p><h2>OPFS</h2><p>Use <code>@offlinejs/storage-opfs</code> for large browser datasets backed by the Origin Private File System.</p><h2>Future adapters</h2><p>LocalStorage and other platform-specific adapters can be added without changing <code>@offlinejs/core</code>.
 </p>
       </article>
     </div>

@@ -6,6 +6,7 @@ Adapters implement `StorageAdapter` from `@offlinejs/types`.
 interface StorageAdapter {
   get(collection, id);
   set(collection, value);
+  setMany?(collection, values); // optional bulk write
   delete(collection, id);
   find(collection, query);
   clear(collection?);
@@ -13,6 +14,8 @@ interface StorageAdapter {
 }
 ```
 
+Prefer `setMany` for ingest and sync pull when the adapter sets `capabilities.bulkWrites`.
+IndexedDB, memory, SQLite, and OPFS implement it — one durable batch instead of N transactions.
 Adapters that support secondary index metadata also implement:
 
 ```ts
@@ -35,8 +38,18 @@ upgrades for every collection.
 
 ## SQLite
 
-Use `@offlinejs/storage-sqlite` with a pluggable async SQL driver. This keeps the adapter usable
-with Electron, Expo, Bun, server-side SQLite wrappers, and edge runtimes.
+Use `@offlinejs/storage-sqlite` with a pluggable async SQL driver. For Node production:
+
+```ts
+import Database from "better-sqlite3";
+import { createBetterSqlite3DriverAsync, createSQLiteStorage } from "@offlinejs/storage-sqlite";
+
+const storage = createSQLiteStorage({
+  driver: createBetterSqlite3DriverAsync(new Database("offline.db"))
+});
+```
+
+Equality filters + order/limit can push into SQL (`json_extract`) when the query is engine-safe.
 
 ## OPFS
 

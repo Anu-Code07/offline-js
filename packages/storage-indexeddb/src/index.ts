@@ -50,9 +50,10 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   readonly capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "durable",
-    transactions: "best-effort"
+    transactions: "atomic"
   } as const;
 
   private readonly databaseName: string;
@@ -73,30 +74,78 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   }
 
   async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
-    const previous = await this.get(collection, value.id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+
+  async setMany<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void> {
+    if (values.length === 0) {
+      return;
     }
 
-    await this.assertUniqueIndexes(collection, value, previous?.id);
+    const byId = new Map<string, TRecord>();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
 
-    const row: IndexedDBRow = {
-      collection,
-      id: value.id,
-      key: this.key(collection, value.id),
-      value: clone(value)
-    };
+    await this.runInTransaction(
+      [STORE_NAME, INDEX_STORE_NAME, INDEX_ENTRIES_STORE],
+      "readwrite",
+      async (transaction) => {
+        const recordStore = transaction.objectStore(STORE_NAME);
+        const indexStore = transaction.objectStore(INDEX_STORE_NAME);
+        const entryStore = transaction.objectStore(INDEX_ENTRIES_STORE);
+        const definitions = await this.listIndexesFromStore(indexStore, collection);
+        const batchIds = new Set(records.map((record) => record.id));
 
-    await this.request(this.store("readwrite").put(row));
-    await this.writeIndexEntries(collection, value);
+        const previousRows = await Promise.all(
+          records.map((record) =>
+            this.request<IndexedDBRow | undefined>(recordStore.get(this.key(collection, record.id)))
+          )
+        );
+
+        for (const record of records) {
+          await this.assertUniqueIndexesInStore(entryStore, definitions, collection, record, batchIds);
+        }
+
+        for (const previous of previousRows) {
+          if (previous) {
+            await this.removeIndexEntriesInStore(entryStore, definitions, collection, previous.value);
+          }
+        }
+
+        for (const record of records) {
+          const row: IndexedDBRow = {
+            collection,
+            id: record.id,
+            key: this.key(collection, record.id),
+            value: clone(record)
+          };
+          await this.request(recordStore.put(row));
+          await this.writeIndexEntriesInStore(entryStore, definitions, collection, record);
+        }
+      }
+    );
   }
 
   async delete(collection: string, id: string): Promise<void> {
-    const previous = await this.get(collection, id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
-    }
-    await this.request(this.store("readwrite").delete(this.key(collection, id)));
+    await this.runInTransaction(
+      [STORE_NAME, INDEX_STORE_NAME, INDEX_ENTRIES_STORE],
+      "readwrite",
+      async (transaction) => {
+        const recordStore = transaction.objectStore(STORE_NAME);
+        const indexStore = transaction.objectStore(INDEX_STORE_NAME);
+        const entryStore = transaction.objectStore(INDEX_ENTRIES_STORE);
+        const previous = await this.request<IndexedDBRow | undefined>(
+          recordStore.get(this.key(collection, id))
+        );
+        if (previous) {
+          const definitions = await this.listIndexesFromStore(indexStore, collection);
+          await this.removeIndexEntriesInStore(entryStore, definitions, collection, previous.value);
+        }
+        await this.request(recordStore.delete(this.key(collection, id)));
+      }
+    );
   }
 
   async find<TRecord extends EntityRecord>(
@@ -256,24 +305,16 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     record: EntityRecord,
     ignoreId?: string
   ): Promise<void> {
-    for (const definition of await this.listIndexes(collection)) {
-      if (!definition.unique) {
-        continue;
-      }
-
-      const lookup = this.lookupKey(
+    const definitions = await this.listIndexes(collection);
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readonly", async (transaction) => {
+      await this.assertUniqueIndexesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        definitions,
         collection,
-        definition.name,
-        serializeCompoundIndexValue(readIndexFields(record, definition.fields))
+        record,
+        ignoreId ? new Set([ignoreId, record.id]) : new Set([record.id])
       );
-      const entries = await this.request<IndexEntryRow[]>(
-        this.entryLookup("readonly").getAll(lookup)
-      );
-
-      if (entries.some((entry) => entry.recordId !== record.id && entry.recordId !== ignoreId)) {
-        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
-      }
-    }
+    });
   }
 
   private async writeIndexEntries(
@@ -282,8 +323,73 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     definitions?: IndexDefinition[]
   ): Promise<void> {
     const indexes = definitions ?? (await this.listIndexes(collection));
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readwrite", async (transaction) => {
+      await this.writeIndexEntriesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        indexes,
+        collection,
+        record
+      );
+    });
+  }
 
-    for (const definition of indexes) {
+  private async removeIndexEntries(collection: string, record: EntityRecord): Promise<void> {
+    const definitions = await this.listIndexes(collection);
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readwrite", async (transaction) => {
+      await this.removeIndexEntriesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        definitions,
+        collection,
+        record
+      );
+    });
+  }
+
+  private async listIndexesFromStore(
+    store: IDBObjectStore,
+    collection?: string
+  ): Promise<IndexDefinition[]> {
+    const rows = await this.request<Array<IndexDefinition & { id: string }>>(store.getAll());
+    return rows
+      .filter((row) => !collection || row.collection === collection || row.id.startsWith(`${collection}:`))
+      .map((row) => {
+        const definition = { ...row } as IndexDefinition & { id?: string };
+        delete definition.id;
+        return clone(definition);
+      });
+  }
+
+  private async assertUniqueIndexesInStore(
+    entryStore: IDBObjectStore,
+    definitions: IndexDefinition[],
+    collection: string,
+    record: EntityRecord,
+    allowedIds: Set<string>
+  ): Promise<void> {
+    const lookupIndex = entryStore.index(LOOKUP_INDEX);
+    for (const definition of definitions) {
+      if (!definition.unique) {
+        continue;
+      }
+      const lookup = this.lookupKey(
+        collection,
+        definition.name,
+        serializeCompoundIndexValue(readIndexFields(record, definition.fields))
+      );
+      const entries = await this.request<IndexEntryRow[]>(lookupIndex.getAll(lookup));
+      if (entries.some((entry) => !allowedIds.has(entry.recordId))) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+
+  private async writeIndexEntriesInStore(
+    entryStore: IDBObjectStore,
+    definitions: IndexDefinition[],
+    collection: string,
+    record: EntityRecord
+  ): Promise<void> {
+    for (const definition of definitions) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
       const entry: IndexEntryRow = {
         collection,
@@ -293,18 +399,51 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
         recordId: record.id,
         valueKey
       };
-      await this.request(this.entryStore("readwrite").put(entry));
+      await this.request(entryStore.put(entry));
     }
   }
 
-  private async removeIndexEntries(collection: string, record: EntityRecord): Promise<void> {
-    for (const definition of await this.listIndexes(collection)) {
+  private async removeIndexEntriesInStore(
+    entryStore: IDBObjectStore,
+    definitions: IndexDefinition[],
+    collection: string,
+    record: EntityRecord
+  ): Promise<void> {
+    for (const definition of definitions) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
       await this.request(
-        this.entryStore("readwrite").delete(
-          this.entryId(collection, definition.name, valueKey, record.id)
-        )
+        entryStore.delete(this.entryId(collection, definition.name, valueKey, record.id))
       );
+    }
+  }
+
+  private async runInTransaction<TValue>(
+    storeNames: string | string[],
+    mode: IDBTransactionMode,
+    run: (transaction: IDBTransaction) => Promise<TValue>
+  ): Promise<TValue> {
+    const database = await this.database();
+    const transaction = database.transaction(storeNames, mode);
+    const done = new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () =>
+        reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+      transaction.onerror = () =>
+        reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    });
+
+    try {
+      const result = await run(transaction);
+      await done;
+      return result;
+    } catch (error) {
+      try {
+        transaction.abort();
+      } catch {
+        // Transaction may already be finished.
+      }
+      await done.catch(() => undefined);
+      throw error;
     }
   }
 

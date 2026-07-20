@@ -25,6 +25,14 @@
     "tsup": "latest",
     "typescript": "latest"
   },
+  "peerDependencies": {
+    "better-sqlite3": ">=9"
+  },
+  "peerDependenciesMeta": {
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

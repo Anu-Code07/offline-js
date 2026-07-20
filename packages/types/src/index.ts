@@ -66,6 +66,8 @@ export interface PaginatedResult<TRecord extends EntityRecord> {
 export interface TransactionStore {
   get<TRecord extends EntityRecord>(collection: string, id: RecordId): Promise<TRecord | null>;
   set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void>;
+  /** Optional bulk write path — adapters may implement for high-throughput ingest. */
+  setMany?<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void>;
   delete(collection: string, id: RecordId): Promise<void>;
   find<TRecord extends EntityRecord>(
     collection: string,
@@ -81,6 +83,8 @@ export interface StorageMigration {
 
 export interface StorageAdapterCapabilities {
   indexes?: boolean;
+  /** Adapter supports `setMany` for batched writes. */
+  bulkWrites?: boolean;
   migrations?: boolean;
   persistence?: "durable" | "ephemeral";
   transactions?: "atomic" | "best-effort";
@@ -92,6 +96,8 @@ export interface StorageAdapter {
   readonly capabilities?: StorageAdapterCapabilities;
   get<TRecord extends EntityRecord>(collection: string, id: RecordId): Promise<TRecord | null>;
   set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void>;
+  /** Optional bulk write — one durable batch when implemented. */
+  setMany?<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void>;
   delete(collection: string, id: RecordId): Promise<void>;
   find<TRecord extends EntityRecord>(
     collection: string,

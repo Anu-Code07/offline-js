@@ -119,8 +119,12 @@ export type { ConflictStrategy } from "@offlinejs/types";
 export { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 export { createMemoryStorage } from "@offlinejs/storage-memory";
 export { createOPFSStorage } from "@offlinejs/storage-opfs";
-export { createSQLiteStorage } from "@offlinejs/storage-sqlite";
-export type { SQLiteDriver, SQLiteStorageOptions } from "@offlinejs/storage-sqlite";
+export { createSQLiteStorage, createBetterSqlite3DriverAsync } from "@offlinejs/storage-sqlite";
+export type {
+  BetterSqlite3Database,
+  SQLiteDriver,
+  SQLiteStorageOptions
+} from "@offlinejs/storage-sqlite";
 
 // Network
 export {
