@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="OfflineJS — write locally, sync automatically, recover gracefully. The TypeScript offline-first data layer with a durable outbox and conflict strategies you choose."
+    />
+    <title>AI.md · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
+    
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html" aria-current="page">AI.md</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html" aria-current="page">AI.md</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>OfflineJS — AI editor guide</h1><p>Paste this file into Cursor, Copilot Chat, Claude, ChatGPT, or any AI coding agent when you want it to <strong>implement OfflineJS correctly</strong> (including a demo like the stock sync board).</p><hr /></p><h2>Product in one paragraph</h2><p>OfflineJS (<code>@offlinejs/client</code>) is a TypeScript <strong>offline-first data layer</strong>. Apps write to local storage immediately; mutations enter a <strong>durable outbox</strong>; sync flushes to a remote API when online; <strong>conflict strategies</strong> resolve divergences. Prefer the one-import client package. Do not invent parallel IndexedDB wrappers or custom outbox queues.</p><p>Canonical install:</p><pre><code>pnpm add @offlinejs/client</code></pre><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;</code></pre><p>Live reference demo: device → outbox → remote stock board with DevTools  
+https://offline-js-next2.vercel.app/demo</p><hr /></p><h2>Mental model (always preserve)</h2><p>1. <strong>Device storage</strong> — IndexedDB / Memory / OPFS / SQLite  
+2. <strong>Outbox queue</strong> — durable queued mutations (<code>create</code> / <code>update</code> / <code>delete</code>)  
+3. <strong>Remote API</strong> — <code>SyncTransport</code> push/pull when online  </p><p>UI must never block on the network for local writes. Sync is separate (<code>db.sync()</code> or auto-start).</p><hr /></p><h2>Copy-paste: minimal app</h2><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage, devtools } from &quot;@offlinejs/client&quot;;
+
+type Todo = { id: string; title: string; completed: boolean; updatedAt: number };
+
+const db = createOfflineDB&lt;{ todos: Todo }&gt;({
+  baseURL: &quot;https://api.example.com&quot;,
+  storage: OfflineStorage.IndexedDB,
+  sync: {
+    autoStart: true,
+    pull: true,
+    conflictStrategy: ConflictStrategyName.LastWriteWins
+  },
+  plugins: [devtools({ ui: true })] // optional: floating Action/State dock
+});
+
+const todos = db.collection(&quot;todos&quot;);
+await todos.create({ title: &quot;Ship offline sync&quot;, completed: false });
+const open = await todos.find({ filters: { completed: false } });
+todos.subscribe((rows) =&gt; render(rows));
+await db.sync();</code></pre><hr /></p><h2>Copy-paste: stock demo pattern (matches the site Demo tab)</h2><p>Use this when recreating or extending the warehouse stock demo.</p><pre><code>import {
+  BrowserNetworkMonitor,
+  ConflictStrategyName,
+  createDevtoolsController,
+  createIndexedDBStorage,
+  createOfflineDB,
+  devtools,
+  type ConflictStrategy,
+  type OfflineDB,
+  type StorageAdapter,
+  type SyncTransport
+} from &quot;@offlinejs/client&quot;;
+
+type StockItem = {
+  id: string;
+  name: string;
+  qty: number;
+  updatedAt: number;
+};
+
+// 1) Fake or real transport that respects online/offline
+function createStockTransport(api: StockApi, isOnline: () =&gt; boolean): SyncTransport {
+  return {
+    async request(req) {
+      if (!isOnline()) throw new Error(&quot;offline&quot;);
+      // map req.method/url/body → api.push / api.pull
+      return api.handle(req);
+    }
+  };
+}
+
+// 2) Create DB with IndexedDB + conflict strategy + devtools plugin
+const network = new BrowserNetworkMonitor({ initialOnline: true });
+const storage: StorageAdapter = createIndexedDBStorage({ databaseName: &quot;offlinejs-stock-demo&quot; });
+let conflictStrategy: ConflictStrategy = ConflictStrategyName.LastWriteWins;
+
+const db = createOfflineDB&lt;{ stock: StockItem }&gt;({
+  storage,
+  network,
+  transport: createStockTransport(api, () =&gt; network.isOnline()),
+  sync: { autoStart: true, pull: true, conflictStrategy },
+  plugins: [devtools()]
+});
+
+// 3) Inline DevTools panel (demo page pattern)
+const panel = createDevtoolsController(db, { storage });
+panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;)!);
+
+// 4) Local writes always hit the device collection
+const stock = db.collection(&quot;stock&quot;);
+await stock.create({ name: &quot;Oat milk&quot;, qty: 12 });
+await stock.update(id, { qty: 11 });
+
+// 5) Flush outbox when online
+await db.sync();
+
+// 6) Toggle offline without tearing down the DB
+network.setOnline(false); // mutations queue; UI still updates from IndexedDB
+network.setOnline(true);
+await db.sync();</code></pre><h3>Demo UI responsibilities (do not skip)</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Surface</th><th>Shows</th></tr></thead><tbody><tr><td>Device column</td><td>Records from <code>collection.find</code> / subscribe (IndexedDB)</td></tr><tr><td>Outbox column</td><td>Pending queued mutations</td></tr><tr><td>Remote column</td><td>Server/API snapshot after pull/push</td></tr><tr><td>Online toggle</td><td>Drives <code>network</code> monitor</td></tr><tr><td>Conflict select</td><td>Rebuilds DB with <code>ConflictStrategyName.*</code></td></tr><tr><td>DevTools panel</td><td><code>createDevtoolsController(db).mount(...)</code></td></tr></tbody></table></div><p>Conflict strategies to support: <code>LastWriteWins</code>, <code>ClientWins</code>, <code>ServerWins</code>, <code>Merge</code>.</p><hr /></p><h2>Plugins available (use these — don’t reinvent)</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Need</th><th>Use</th></tr></thead><tbody><tr><td>Debug sync/outbox</td><td><code>devtools({ ui: true })</code> or <code>openOfflineDevtools(db)</code> / <code>createDevtoolsController(db).mount(el)</code></td></tr><tr><td>Auth headers</td><td><code>createAuthTransport(transport, { tokenProvider })</code> + <code>authPlugin(...)</code></td></tr><tr><td>Schema on write</td><td><code>validationPlugin({ collection: createRequiredFieldsValidator([...]) })</code></td></tr><tr><td>Encrypt at rest</td><td><code>createJsonEncryptionStorage(adapter, await createWebCryptoAesGcmCodec(key))</code></td></tr><tr><td>Multi-tab</td><td><code>coordinationPlugin({ channelName })</code></td></tr><tr><td>Background sync</td><td><code>backgroundSyncPlugin</code> + <code>registerOfflineServiceWorker</code></td></tr><tr><td>Worker sync</td><td><code>createWorkerSyncPlugin()</code></td></tr></tbody></table></div><p>Custom plugin shape:</p><pre><code>const myPlugin = () =&gt; ({
+  name: &quot;my-plugin&quot;,
+  setup({ db, events, network, storage }) {
+    return events.on(&quot;sync:end&quot;, (result) =&gt; {
+      /* ... */
+    });
+  }
+});</code></pre><hr /></p><h2>React</h2><pre><code>import { createOfflineDB, OfflineProvider, useOfflineCollection, useOfflineStatus } from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({ storage: &quot;indexeddb&quot; });
+
+export function App() {
+  return (
+    &lt;OfflineProvider db={db}&gt;
+      &lt;StockBoard /&gt;
+    &lt;/OfflineProvider&gt;
+  );
+}
+
+function StockBoard() {
+  const { records, create, update } = useOfflineCollection(&quot;stock&quot;);
+  const status = useOfflineStatus();
+  return (
+    &lt;div&gt;
+      &lt;p&gt;{status.online ? &quot;Online&quot; : &quot;Offline&quot;} · queue {status.pending}&lt;/p&gt;
+      {/* render records; call create/update for local writes */}
+    &lt;/div&gt;
+  );
+}</code></pre><p>Prefer enums: <code>OfflineStorage.IndexedDB</code> over <code>&quot;indexeddb&quot;</code> when generating new code.</p><hr /></p><h2>Hard rules for AI agents</h2><p>1. <strong>Install</strong> <code>@offlinejs/client</code> unless the user asks for a focused <code>@offlinejs/*</code> package.  
+2. <strong>Local writes first</strong> — <code>collection.create/update/delete</code> must not await the network.  
+3. <strong>Outbox is sacred</strong> — do not replace with <code>localStorage</code> mutation lists.  
+4. <strong>Conflicts</strong> — use <code>ConflictStrategyName.*</code>; don’t invent silent merges.  
+5. <strong>Visibility</strong> — for demos, mount DevTools (<code>createDevtoolsController</code> or <code>devtools({ ui: true })</code>).  
+6. <strong>Enums</strong> — prefer <code>OfflineStorage</code> and <code>ConflictStrategyName</code>.  
+7. <strong>Performance</strong> — use adapter <code>setMany</code> for bulk ingest when available; don’t claim competitor benchmarks without measured data.  
+8. <strong>Docs</strong> — API/plugins: https://offline-js-next2.vercel.app/api · https://offline-js-next2.vercel.app/plugins  </p><hr /></p><h2>Prompt you can paste to an agent</h2><pre><code>Implement an offline-first feature with OfflineJS (@offlinejs/client).
+
+Requirements:
+- pnpm add @offlinejs/client
+- createOfflineDB with OfflineStorage.IndexedDB
+- ConflictStrategyName.LastWriteWins (make strategy selectable if building a demo)
+- Local collection writes + durable outbox + db.sync() when online
+- Include BrowserNetworkMonitor (or equivalent) so offline mode queues mutations
+- Add devtools(): either floating dock (ui: true) or createDevtoolsController(db).mount(#el)
+- If building a demo: three columns Device | Outbox | Remote like https://offline-js-next2.vercel.app/demo
+- Do not hand-roll IndexedDB or a custom sync queue
+- Follow AI.md / OfflineJS docs for plugins (auth, validation, encryption, coordination) only if needed</code></pre><hr /></p><h2>Repo map (for contributors)</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>packages/offlinejs</code></td><td>npm <code>@offlinejs/client</code> umbrella</td></tr><tr><td><code>packages/core</code></td><td>DB, collections, plugin host</td></tr><tr><td><code>packages/sync</code> / <code>packages/queue</code></td><td>Sync engine + outbox</td></tr><tr><td><code>packages/storage-*</code></td><td>Memory, IndexedDB, OPFS, SQLite</td></tr><tr><td><code>packages/devtools</code> / <code>devtools-ui</code></td><td>Logger plugin + UI</td></tr><tr><td><code>docs-site/demo</code></td><td>Stock demo source (<code>app.ts</code>)</td></tr><tr><td><code>docs/</code></td><td>Markdown docs built into the static site</td></tr></tbody></table></div>
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner footer-inner">
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <strong>OfflineJS</strong>
+          </div>
+          <p class="footer-copy">
+            Write locally. Sync when the network returns. Choose how conflicts resolve —
+            with a sync pipeline you can see.
+          </p>
+          <div class="footer-links">
+            <a href="demo.html">Live demo</a>
+            <a href="quick-start.html">Quick start</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
+            <a href="benchmarks.html">Benchmarks</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js?v=296300df19"></script>
+    
+  </body>
+</html>

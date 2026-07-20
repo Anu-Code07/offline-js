@@ -380,6 +380,47 @@ body[data-demo-link="offline"] .demo-flow-node[data-node="outbox"] {
   border: 0;
 }
 
+.demo-ai-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.demo-ai-header h2 {
+  margin: 0 0 0.35rem;
+}
+
+.demo-ai-header .demo-meta {
+  margin: 0;
+  max-width: 40rem;
+}
+
+.demo-ai-prompt {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(500px 220px at 100% 0%, rgba(15, 174, 154, 0.16), transparent 55%),
+    linear-gradient(160deg, #123237 0%, #0d2327 100%);
+  color: #e7fffa;
+  font-family: var(--font-mono);
+  font-size: clamp(0.75rem, 2.2vw, 0.86rem);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.demo-ai-status {
+  margin: 0.75rem 0 0;
+  font-weight: 700;
+  color: var(--signal-deep);
+}
+
 @media (max-width: 720px) {
   .demo-flow {
     grid-template-columns: 1fr;
@@ -390,5 +431,9 @@ body[data-demo-link="offline"] .demo-flow-node[data-node="outbox"] {
     transform: rotate(90deg);
     justify-self: start;
     margin-left: 1rem;
+  }
+
+  .demo-ai-header .button {
+    width: 100%;
   }
 }

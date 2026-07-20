@@ -783,6 +783,12 @@ body.nav-open .nav-toggle-bars::after {
   opacity: 0.9;
 }
 
+.content hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 2rem 0;
+}
+
 .content p,
 .content li {
   color: var(--ink-soft);

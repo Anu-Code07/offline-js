@@ -35,6 +35,16 @@
     "url": "/sync.html"
   },
   {
+    "slug": "plugins",
+    "title": "Plugins",
+    "url": "/plugins.html"
+  },
+  {
+    "slug": "ai",
+    "title": "AI.md",
+    "url": "/ai.html"
+  },
+  {
     "slug": "benchmarks",
     "title": "Benchmarks",
     "url": "/benchmarks.html"
@@ -43,11 +53,6 @@
     "slug": "performance",
     "title": "Performance",
     "url": "/performance.html"
-  },
-  {
-    "slug": "plugins",
-    "title": "Plugins",
-    "url": "/plugins.html"
   },
   {
     "slug": "contracts",

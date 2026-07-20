@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
     
   </head>
   <body>
@@ -22,16 +22,16 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html" aria-current="page">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html" aria-current="page">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html" aria-current="page">Plugins</a><a href="ai.html">AI.md</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>Plugins</h1><p>Plugins let applications add behavior without changing core internals.</p><pre><code>const analytics = () =&gt; ({
+        <h1>Plugins</h1><p>Plugins let applications add behavior without changing core internals. Pass them to <code>createOfflineDB({ plugins })</code> or call <code>db.use(plugin)</code>.</p><pre><code>const analytics = () =&gt; ({
   name: &quot;analytics&quot;,
   setup({ events }) {
     return events.on(&quot;sync:end&quot;, (result) =&gt; {
@@ -40,29 +40,22 @@
   }
 });
 
-db.use(analytics());</code></pre><p>Good plugin use cases:</p><ul><li>authentication</li>
-<li>encryption</li>
-<li>logging</li>
-<li>analytics</li>
-<li>schema validation</li>
-<li>devtools</li>
-</ul>
-Plugins receive <code>db</code>, <code>events</code>, <code>network</code>, and <code>storage</code>. They may return a disposer function.</p><h2>Devtools packages</h2><p>OfflineJS ships Redux-style developer tools:</p><ul><li><code>@offlinejs/devtools</code> — console logger plugin; optional floating UI via <code>ui: true</code></li>
+db.use(analytics());</code></pre><p><code>setup</code> receives <code>{ db, events, network, storage }</code> and may return a disposer.</p><h2>Catalog (shipped with <code>@offlinejs/client</code>)</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Plugin / helper</th><th>Role</th></tr></thead><tbody><tr><td><code>devtools({ ui? })</code></td><td>Event logger + optional floating Redux-style dock</td></tr><tr><td><code>createDevtoolsController</code> / <code>openOfflineDevtools</code></td><td>Inline or floating Action / State / Outbox UI</td></tr><tr><td><code>authPlugin</code> / <code>createAuthTransport</code></td><td>Attach &amp; refresh auth headers on sync transport</td></tr><tr><td><code>validationPlugin</code> / <code>createValidatedStorage</code></td><td>Validate records before they hit storage</td></tr><tr><td><code>createJsonEncryptionStorage</code></td><td>Encrypt JSON records at rest (AES-GCM)</td></tr><tr><td><code>coordinationPlugin</code></td><td>Multi-tab leader election &amp; sync coordination</td></tr><tr><td><code>backgroundSyncPlugin</code></td><td>Ask the service worker to sync when possible</td></tr><tr><td><code>createWorkerSyncPlugin</code></td><td>Run sync inside a Web Worker</td></tr></tbody></table></div><p>Good plugin use cases: authentication, encryption, logging, analytics, schema validation, DevTools, multi-tab leadership, background sync.</p><h2>DevTools</h2><p>OfflineJS ships Redux-style developer tools:</p><ul><li><code>@offlinejs/devtools</code> — console logger plugin; optional floating UI via <code>ui: true</code></li>
 <li><code>@offlinejs/devtools-ui</code> — dockable Action / State panel (<code>mount</code>, <code>open</code>, pause/clear/filter)</li>
 </ul>
-<h3>One-liner floating dock (closest to Redux DevTools)</h3><pre><code>import { createOfflineDB, openOfflineDevtools, devtools } from &quot;@offlinejs/client&quot;;
+<h3>One-liner floating dock</h3><pre><code>import { createOfflineDB, openOfflineDevtools, OfflineStorage, devtools } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
-  storage: &quot;indexeddb&quot;,
+  storage: OfflineStorage.IndexedDB,
   plugins: [devtools({ ui: true })] // logs + opens floating dock
 });
 
 // or open manually:
 const panel = openOfflineDevtools(db, { position: &quot;bottom&quot; });
-// Ctrl/⌘ + Shift + O toggles the dock</code></pre><h3>Inline panel (docs / embeds)</h3><pre><code>import { createOfflineDB, createDevtoolsController, devtools } from &quot;@offlinejs/client&quot;;
+// Ctrl/⌘ + Shift + O toggles the dock</code></pre><h3>Inline panel (docs / embeds)</h3><pre><code>import { createOfflineDB, createDevtoolsController, OfflineStorage, devtools } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
-  storage: &quot;indexeddb&quot;,
+  storage: OfflineStorage.IndexedDB,
   plugins: [devtools()]
 });
 
@@ -73,7 +66,87 @@ panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pr
 <li><strong>State / Outbox</strong> tab (when storage is available)</li>
 <li>floating dock (<code>open()</code>) or inline <code>mount(target)</code></li>
 </ul>
-See the interactive showcase at <code>/demo</code>.
+See the interactive showcase at <a href="demo.html">the live demo</a>.</p><h2>Auth</h2><p>Wrap any <code>SyncTransport</code> so every request carries a token:</p><pre><code>import { authPlugin, createAuthTransport, createFetchTransport, createOfflineDB } from &quot;@offlinejs/client&quot;;
+
+const transport = createAuthTransport(createFetchTransport({ baseURL: &quot;/api&quot; }), {
+  tokenProvider: () =&gt; localStorage.getItem(&quot;access_token&quot;),
+  headerName: &quot;authorization&quot;,
+  scheme: &quot;Bearer&quot;,
+  retryOnUnauthorized: true,
+  refreshToken: () =&gt; refreshSession()
+});
+
+createOfflineDB({
+  transport,
+  plugins: [
+    authPlugin({
+      tokenProvider: () =&gt; localStorage.getItem(&quot;access_token&quot;)
+    })
+  ]
+});</code></pre><h2>Validation</h2><p>Reject bad writes before they enter storage / outbox:</p><pre><code>import {
+  composeValidators,
+  createRequiredFieldsValidator,
+  createTypeValidator,
+  createOfflineDB,
+  validationPlugin
+} from &quot;@offlinejs/client&quot;;
+
+createOfflineDB({
+  plugins: [
+    validationPlugin({
+      stock: composeValidators(
+        createRequiredFieldsValidator([&quot;name&quot;, &quot;qty&quot;]),
+        createTypeValidator({ name: &quot;string&quot;, qty: &quot;number&quot; })
+      )
+    })
+  ]
+});</code></pre><p>Helpers: <code>assertValid</code>, <code>createValidatedStorage</code>, <code>OfflineValidationError</code>.</p><h2>Encryption</h2><pre><code>import {
+  createIndexedDBStorage,
+  createJsonEncryptionStorage,
+  createOfflineDB,
+  createWebCryptoAesGcmCodec,
+  generateAesGcmKey
+} from &quot;@offlinejs/client&quot;;
+
+const key = await generateAesGcmKey();
+const codec = await createWebCryptoAesGcmCodec(key);
+
+createOfflineDB({
+  storage: createJsonEncryptionStorage(createIndexedDBStorage({ databaseName: &quot;secure&quot; }), codec)
+});</code></pre><h2>Multi-tab coordination</h2><pre><code>import { coordinationPlugin, createOfflineDB } from &quot;@offlinejs/client&quot;;
+
+createOfflineDB({
+  plugins: [
+    coordinationPlugin({
+      channelName: &quot;offlinejs-app&quot;,
+      syncDebounceMs: 200
+    })
+  ]
+});</code></pre><p>Uses <code>BroadcastChannel</code> when available so tabs elect a leader and avoid stampedes.</p><h2>Background sync &amp; workers</h2><pre><code>import {
+  backgroundSyncPlugin,
+  createWorkerSyncPlugin,
+  registerOfflineServiceWorker,
+  createOfflineDB
+} from &quot;@offlinejs/client&quot;;
+
+await registerOfflineServiceWorker({ scriptUrl: &quot;/sw.js&quot; });
+
+createOfflineDB({
+  plugins: [
+    backgroundSyncPlugin({ syncTag: &quot;offlinejs-sync&quot; }),
+    createWorkerSyncPlugin()
+  ]
+});</code></pre><h2>Writing your own</h2><pre><code>import type { OfflinePlugin } from &quot;@offlinejs/client&quot;;
+
+export const metricsPlugin = (): OfflinePlugin =&gt; ({
+  name: &quot;metrics&quot;,
+  setup({ events }) {
+    const stop = events.on(&quot;conflict&quot;, (detail) =&gt; {
+      console.warn(&quot;conflict&quot;, detail);
+    });
+    return stop;
+  }
+});</code></pre><p>For AI-assisted implementation (including recreating the stock demo), paste <a href="ai.html">AI.md</a> into your editor.
 </p>
       </article>
     </div>
@@ -91,13 +164,14 @@ See the interactive showcase at <code>/demo</code>.
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js?v=358c0d16cc"></script>
+    <script src="assets/site.js?v=296300df19"></script>
     
   </body>
 </html>
