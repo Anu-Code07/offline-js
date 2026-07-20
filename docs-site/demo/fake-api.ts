@@ -6,78 +6,88 @@ import {
   type TransportResponse
 } from "@offlinejs/types";
 
-export type DemoTodo = EntityRecord & {
-  title: string;
-  completed: boolean;
-  assignee?: string;
+/** Warehouse stock line — quantity conflicts are easy to see side-by-side. */
+export type StockItem = EntityRecord & {
+  sku: string;
+  name: string;
+  qty: number;
+  aisle: string;
   createdAt: number;
   updatedAt: number;
 };
 
-const TITLES = [
-  "Ship offline sync",
-  "Draft release notes",
-  "Fix flaky queue retry",
-  "Review conflict strategy",
-  "Polish demo UI",
-  "Add IndexedDB indexes",
-  "Write FAQ answer",
-  "Benchmark OPFS writes",
-  "Wire service worker sync",
-  "Tighten auth refresh"
+const NAMES = [
+  "Espresso beans",
+  "Oat milk",
+  "Paper cups",
+  "Cold brew concentrate",
+  "Sugar sticks",
+  "Croissant dough",
+  "Matcha powder",
+  "Ceramic mugs",
+  "Cleaning tablets",
+  "Vanilla syrup"
 ];
 
-const ASSIGNEES = ["Ada", "Grace", "Linus", "Margaret", "Alan", "Katherine"];
+const AISLES = ["A1", "A2", "B1", "B2", "C1", "Cold"];
 
 const randomItem = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)] as T;
 
 const createId = (): string =>
-  globalThis.crypto?.randomUUID?.() ?? `todo_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  globalThis.crypto?.randomUUID?.() ?? `stock_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
-export class FakeTodoApi {
-  private readonly records = new Map<string, DemoTodo>();
+const createSku = (): string =>
+  `SKU-${Math.floor(1000 + Math.random() * 9000)}`;
+
+export class FakeStockApi {
+  private readonly records = new Map<string, StockItem>();
   private readonly conflictOnce = new Set<string>();
 
   constructor() {
     this.seedRandom(4);
   }
 
-  list(): DemoTodo[] {
-    return [...this.records.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+  list(): StockItem[] {
+    return [...this.records.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  seedRandom(count = 5): DemoTodo[] {
-    const created: DemoTodo[] = [];
+  get(id: string): StockItem | null {
+    return this.records.get(id) ?? null;
+  }
+
+  seedRandom(count = 5): StockItem[] {
+    const created: StockItem[] = [];
 
     for (let index = 0; index < count; index += 1) {
       const now = Date.now() - Math.floor(Math.random() * 50_000);
-      const todo: DemoTodo = {
+      const item: StockItem = {
         id: createId(),
-        title: randomItem(TITLES),
-        completed: Math.random() > 0.65,
-        assignee: randomItem(ASSIGNEES),
+        sku: createSku(),
+        name: randomItem(NAMES),
+        qty: 4 + Math.floor(Math.random() * 24),
+        aisle: randomItem(AISLES),
         createdAt: now,
         updatedAt: now
       };
-      this.records.set(todo.id, todo);
-      created.push(todo);
+      this.records.set(item.id, item);
+      created.push(item);
     }
 
     return created;
   }
 
-  /** Mutate server copy and force the next client write to 409. */
-  prepareConflict(id: string): DemoTodo | null {
+  /** Change the server copy and force the next client write to 409. */
+  prepareConflict(id: string): StockItem | null {
     const current = this.records.get(id);
 
     if (!current) {
       return null;
     }
 
-    const serverEdit: DemoTodo = {
+    const serverEdit: StockItem = {
       ...current,
-      title: `SERVER: ${randomItem(TITLES)}`,
-      assignee: randomItem(ASSIGNEES),
+      qty: current.qty + 3 + Math.floor(Math.random() * 5),
+      aisle: randomItem(AISLES),
       updatedAt: Date.now() + 1
     };
     this.records.set(id, serverEdit);
@@ -97,13 +107,12 @@ export class FakeTodoApi {
         request: TransportRequest<TBody>
       ): Promise<TransportResponse<TData>> => {
         if (!isOnline()) {
-          const error = new Error("Fake API is offline");
+          const error = new Error("Remote warehouse API is offline");
           Object.assign(error, { status: 0 });
           throw error;
         }
 
-        // Simulate latency so queue/sync feel real.
-        await delay(120 + Math.floor(Math.random() * 180));
+        await delay(140 + Math.floor(Math.random() * 200));
         return this.handle(request) as Promise<TransportResponse<TData>>;
       }
     };
@@ -112,7 +121,7 @@ export class FakeTodoApi {
   private async handle<TBody>(request: TransportRequest<TBody>): Promise<TransportResponse> {
     const [collection, id] = request.path.replace(/^\//, "").split("/");
 
-    if (collection !== "todos") {
+    if (collection !== "stock") {
       return { data: null, status: 404 };
     }
 
@@ -121,18 +130,19 @@ export class FakeTodoApi {
     }
 
     if (request.method === "POST" && !id) {
-      const body = (request.body ?? {}) as Partial<DemoTodo>;
+      const body = (request.body ?? {}) as Partial<StockItem>;
       const now = Date.now();
-      const todo: DemoTodo = {
+      const item: StockItem = {
         id: typeof body.id === "string" ? body.id : createId(),
-        title: String(body.title ?? "Untitled"),
-        completed: Boolean(body.completed),
-        ...(body.assignee ? { assignee: String(body.assignee) } : {}),
+        sku: String(body.sku ?? createSku()),
+        name: String(body.name ?? "Untitled item"),
+        qty: Number(body.qty ?? 0),
+        aisle: String(body.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? now),
         updatedAt: Number(body.updatedAt ?? now)
       };
-      this.records.set(todo.id, todo);
-      return { data: todo, status: 201 };
+      this.records.set(item.id, item);
+      return { data: item, status: 201 };
     }
 
     if (!id) {
@@ -154,15 +164,14 @@ export class FakeTodoApi {
         throw error;
       }
 
-      const body = (request.body ?? {}) as Partial<DemoTodo>;
+      const body = (request.body ?? {}) as Partial<StockItem>;
       const now = Date.now();
-      const next: DemoTodo = {
+      const next: StockItem = {
         id,
-        title: String(body.title ?? existing?.title ?? "Untitled"),
-        completed: body.completed ?? existing?.completed ?? false,
-        ...(body.assignee || existing?.assignee
-          ? { assignee: String(body.assignee ?? existing?.assignee) }
-          : {}),
+        sku: String(body.sku ?? existing?.sku ?? createSku()),
+        name: String(body.name ?? existing?.name ?? "Untitled item"),
+        qty: Number(body.qty ?? existing?.qty ?? 0),
+        aisle: String(body.aisle ?? existing?.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? existing?.createdAt ?? now),
         updatedAt: Number(body.updatedAt ?? now)
       };

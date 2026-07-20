@@ -1572,8 +1572,8 @@ var OPFSStorageAdapter = class {
     if (this.directory) {
       return this.directory.getDirectoryHandle(this.rootName, { create: true });
     }
-    const storage = globalThis.navigator?.storage;
-    const root = await storage?.getDirectory?.();
+    const storage2 = globalThis.navigator?.storage;
+    const root = await storage2?.getDirectory?.();
     if (!root) {
       throw new Error("OPFS is not available in this runtime");
     }
@@ -1751,11 +1751,11 @@ var escapeHtml = (value) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;
 // packages/offlinejs/src/index.ts
 var isBrowserRuntime = () => typeof globalThis.window !== "undefined" && typeof globalThis.indexedDB !== "undefined";
 var isStorageAdapter = (value) => typeof value === "object" && value !== null && "get" in value && "set" in value;
-var resolveStorage = (storage) => {
-  if (isStorageAdapter(storage)) {
-    return storage;
+var resolveStorage = (storage2) => {
+  if (isStorageAdapter(storage2)) {
+    return storage2;
   }
-  const preset = storage ?? (isBrowserRuntime() ? "indexeddb" /* IndexedDB */ : "memory" /* Memory */);
+  const preset = storage2 ?? (isBrowserRuntime() ? "indexeddb" /* IndexedDB */ : "memory" /* Memory */);
   switch (preset) {
     case "memory" /* Memory */:
       return createMemoryStorage();
@@ -1769,56 +1769,61 @@ var resolveStorage = (storage) => {
   }
 };
 var createOfflineDB2 = (options = {}) => {
-  const { storage, ...rest } = options;
+  const { storage: storage2, ...rest } = options;
   return createOfflineDB({
     ...rest,
-    storage: resolveStorage(storage)
+    storage: resolveStorage(storage2)
   });
 };
 
 // docs-site/demo/fake-api.ts
-var TITLES = [
-  "Ship offline sync",
-  "Draft release notes",
-  "Fix flaky queue retry",
-  "Review conflict strategy",
-  "Polish demo UI",
-  "Add IndexedDB indexes",
-  "Write FAQ answer",
-  "Benchmark OPFS writes",
-  "Wire service worker sync",
-  "Tighten auth refresh"
+var NAMES = [
+  "Espresso beans",
+  "Oat milk",
+  "Paper cups",
+  "Cold brew concentrate",
+  "Sugar sticks",
+  "Croissant dough",
+  "Matcha powder",
+  "Ceramic mugs",
+  "Cleaning tablets",
+  "Vanilla syrup"
 ];
-var ASSIGNEES = ["Ada", "Grace", "Linus", "Margaret", "Alan", "Katherine"];
+var AISLES = ["A1", "A2", "B1", "B2", "C1", "Cold"];
 var randomItem = (items) => items[Math.floor(Math.random() * items.length)];
-var createId2 = () => globalThis.crypto?.randomUUID?.() ?? `todo_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-var FakeTodoApi = class {
+var createId2 = () => globalThis.crypto?.randomUUID?.() ?? `stock_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+var createSku = () => `SKU-${Math.floor(1e3 + Math.random() * 9e3)}`;
+var FakeStockApi = class {
   records = /* @__PURE__ */ new Map();
   conflictOnce = /* @__PURE__ */ new Set();
   constructor() {
     this.seedRandom(4);
   }
   list() {
-    return [...this.records.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...this.records.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  get(id) {
+    return this.records.get(id) ?? null;
   }
   seedRandom(count = 5) {
     const created = [];
     for (let index = 0; index < count; index += 1) {
       const now2 = Date.now() - Math.floor(Math.random() * 5e4);
-      const todo = {
+      const item = {
         id: createId2(),
-        title: randomItem(TITLES),
-        completed: Math.random() > 0.65,
-        assignee: randomItem(ASSIGNEES),
+        sku: createSku(),
+        name: randomItem(NAMES),
+        qty: 4 + Math.floor(Math.random() * 24),
+        aisle: randomItem(AISLES),
         createdAt: now2,
         updatedAt: now2
       };
-      this.records.set(todo.id, todo);
-      created.push(todo);
+      this.records.set(item.id, item);
+      created.push(item);
     }
     return created;
   }
-  /** Mutate server copy and force the next client write to 409. */
+  /** Change the server copy and force the next client write to 409. */
   prepareConflict(id) {
     const current = this.records.get(id);
     if (!current) {
@@ -1826,8 +1831,8 @@ var FakeTodoApi = class {
     }
     const serverEdit = {
       ...current,
-      title: `SERVER: ${randomItem(TITLES)}`,
-      assignee: randomItem(ASSIGNEES),
+      qty: current.qty + 3 + Math.floor(Math.random() * 5),
+      aisle: randomItem(AISLES),
       updatedAt: Date.now() + 1
     };
     this.records.set(id, serverEdit);
@@ -1843,18 +1848,18 @@ var FakeTodoApi = class {
       contractVersion: SYNC_TRANSPORT_CONTRACT_VERSION,
       request: async (request) => {
         if (!isOnline()) {
-          const error = new Error("Fake API is offline");
+          const error = new Error("Remote warehouse API is offline");
           Object.assign(error, { status: 0 });
           throw error;
         }
-        await delay(120 + Math.floor(Math.random() * 180));
+        await delay(140 + Math.floor(Math.random() * 200));
         return this.handle(request);
       }
     };
   }
   async handle(request) {
     const [collection, id] = request.path.replace(/^\//, "").split("/");
-    if (collection !== "todos") {
+    if (collection !== "stock") {
       return { data: null, status: 404 };
     }
     if (request.method === "GET" && !id) {
@@ -1863,16 +1868,17 @@ var FakeTodoApi = class {
     if (request.method === "POST" && !id) {
       const body = request.body ?? {};
       const now2 = Date.now();
-      const todo = {
+      const item = {
         id: typeof body.id === "string" ? body.id : createId2(),
-        title: String(body.title ?? "Untitled"),
-        completed: Boolean(body.completed),
-        ...body.assignee ? { assignee: String(body.assignee) } : {},
+        sku: String(body.sku ?? createSku()),
+        name: String(body.name ?? "Untitled item"),
+        qty: Number(body.qty ?? 0),
+        aisle: String(body.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? now2),
         updatedAt: Number(body.updatedAt ?? now2)
       };
-      this.records.set(todo.id, todo);
-      return { data: todo, status: 201 };
+      this.records.set(item.id, item);
+      return { data: item, status: 201 };
     }
     if (!id) {
       return { data: null, status: 400 };
@@ -1893,9 +1899,10 @@ var FakeTodoApi = class {
       const now2 = Date.now();
       const next = {
         id,
-        title: String(body.title ?? existing?.title ?? "Untitled"),
-        completed: body.completed ?? existing?.completed ?? false,
-        ...body.assignee || existing?.assignee ? { assignee: String(body.assignee ?? existing?.assignee) } : {},
+        sku: String(body.sku ?? existing?.sku ?? createSku()),
+        name: String(body.name ?? existing?.name ?? "Untitled item"),
+        qty: Number(body.qty ?? existing?.qty ?? 0),
+        aisle: String(body.aisle ?? existing?.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? existing?.createdAt ?? now2),
         updatedAt: Number(body.updatedAt ?? now2)
       };
@@ -1910,31 +1917,41 @@ var delay = (ms) => new Promise((resolve) => {
 });
 
 // docs-site/demo/app.ts
-var api = new FakeTodoApi();
+var DB_NAME = "offlinejs-stock-demo";
+var QUEUE_COLLECTION = "__offline_queue";
+var api = new FakeStockApi();
 var network = new BrowserNetworkMonitor({ initialOnline: true });
+var storage = createIndexedDBStorage({ databaseName: DB_NAME });
 var conflictStrategy = "lastWriteWins" /* LastWriteWins */;
 var db = createDemoDb();
 var panel = createDevtoolsController(db);
 var unsubscribe;
+var eventDisposers = [];
 var els = {
   onlineToggle: document.querySelector("#online-toggle"),
   onlineLabel: document.querySelector("#online-label"),
+  linkState: document.querySelector("#link-state"),
   strategy: document.querySelector("#conflict-strategy"),
   seedBtn: document.querySelector("#seed-random"),
   syncBtn: document.querySelector("#sync-now"),
   conflictBtn: document.querySelector("#simulate-conflict"),
   resetBtn: document.querySelector("#reset-demo"),
-  titleInput: document.querySelector("#todo-title"),
-  addBtn: document.querySelector("#add-todo"),
-  list: document.querySelector("#todo-list"),
-  queueMeta: document.querySelector("#queue-meta"),
+  nameInput: document.querySelector("#item-name"),
+  qtyInput: document.querySelector("#item-qty"),
+  addBtn: document.querySelector("#add-item"),
+  deviceList: document.querySelector("#device-list"),
+  outboxList: document.querySelector("#outbox-list"),
+  serverList: document.querySelector("#server-list"),
+  deviceMeta: document.querySelector("#device-meta"),
+  outboxMeta: document.querySelector("#outbox-meta"),
   serverMeta: document.querySelector("#server-meta"),
   status: document.querySelector("#demo-status"),
+  flow: document.querySelector("#sync-flow"),
   devtools: document.querySelector("#offlinejs-devtools")
 };
 function createDemoDb() {
   return createOfflineDB2({
-    storage: createIndexedDBStorage({ databaseName: "offlinejs-demo" }),
+    storage,
     network,
     transport: api.createTransport(() => network.isOnline()),
     sync: {
@@ -1948,125 +1965,167 @@ function createDemoDb() {
 async function boot() {
   panel.mount(els.devtools);
   wireControls();
+  wireEvents();
   await bindCollection();
   await pullIfOnline();
-  renderServerMeta();
-  setStatus("Demo ready \u2014 try going offline, editing, then syncing.");
+  await refreshAll();
+  setStatus("Go offline, change a quantity, watch the outbox fill, then sync.");
 }
 function wireControls() {
   els.onlineToggle.checked = network.isOnline();
-  els.onlineLabel.textContent = network.isOnline() ? "Online" : "Offline";
+  updateLinkUi(network.isOnline());
   els.onlineToggle.addEventListener("change", () => {
     network.setOnline(els.onlineToggle.checked);
-    els.onlineLabel.textContent = els.onlineToggle.checked ? "Online" : "Offline";
-    setStatus(els.onlineToggle.checked ? "Back online \u2014 sync can resume." : "Offline \u2014 writes stay queued.");
+    updateLinkUi(els.onlineToggle.checked);
+    setStatus(
+      els.onlineToggle.checked ? "Link restored \u2014 outbox can flush to the remote API." : "Link cut \u2014 edits stay on this device and pile up in the outbox."
+    );
+    void refreshAll();
   });
   els.strategy.value = String(conflictStrategy);
   els.strategy.addEventListener("change", async () => {
     conflictStrategy = els.strategy.value;
-    await recreateDb(`Conflict strategy set to ${conflictStrategy}`);
+    await recreateDb(`Conflict strategy \u2192 ${conflictStrategy}`);
   });
   els.seedBtn.addEventListener("click", async () => {
-    const created = api.seedRandom(5);
+    const created = api.seedRandom(4);
     if (network.isOnline()) {
-      await db.collection("todos").sync();
+      await db.collection("stock").sync();
       await db.sync();
-    } else {
-    }
-    renderServerMeta();
-    if (network.isOnline()) {
       await refreshLocalFromServer();
     }
-    setStatus(`Fake API generated ${created.length} random todos.`);
+    await refreshAll();
+    setStatus(`Remote API seeded ${created.length} stock lines.`);
   });
   els.syncBtn.addEventListener("click", async () => {
     if (!network.isOnline()) {
-      setStatus("Can't sync while offline.");
+      setStatus("Can't sync while the link is offline.");
       return;
     }
-    setStatus("Syncing\u2026");
-    await db.collection("todos").sync();
-    await db.sync();
-    await refreshView();
-    renderServerMeta();
-    setStatus("Sync finished.");
+    setStatus("Flushing outbox \u2192 remote API\u2026");
+    els.flow?.classList.add("is-syncing");
+    try {
+      await db.collection("stock").sync();
+      await db.sync();
+      await refreshAll();
+      setStatus("Sync finished. Device and remote should match (unless a conflict remains).");
+    } finally {
+      els.flow?.classList.remove("is-syncing");
+    }
   });
   els.conflictBtn.addEventListener("click", async () => {
-    const local = await db.collection("todos").find({ limit: 1 });
+    const local = await db.collection("stock").find({ limit: 1 });
     const target = local[0];
     if (!target) {
-      setStatus("Add or seed a todo first, then sync it.");
+      setStatus("Add or seed stock first, then sync it once.");
       return;
     }
     if (network.isOnline()) {
-      await db.collection("todos").sync();
+      await db.collection("stock").sync();
     }
     const serverEdit = api.prepareConflict(target.id);
-    await db.collection("todos").update(target.id, {
-      title: `CLIENT: ${target.title}`,
-      completed: !target.completed
+    await db.collection("stock").update(target.id, {
+      qty: Math.max(0, target.qty - 2),
+      name: target.name
     });
-    renderServerMeta();
+    await refreshAll();
     setStatus(
-      serverEdit ? "Conflict prepared. Stay online and hit Sync to resolve with the dropdown strategy." : "Could not prepare conflict."
+      serverEdit ? `Conflict staged on ${target.name}: remote qty ${serverEdit.qty}, device qty ${Math.max(0, target.qty - 2)}. Sync to resolve.` : "Could not stage a conflict."
     );
-    await refreshView();
   });
   els.resetBtn.addEventListener("click", async () => {
     api.clear();
-    api.seedRandom(3);
-    await db.collection("todos").find().then(async (rows) => {
-      for (const row of rows) {
-        await db.collection("todos").delete(row.id);
-      }
-    });
-    await recreateDb("Demo reset with fresh random server data.", true);
+    api.seedRandom(4);
+    await recreateDb("Demo reset \u2014 fresh remote stock, empty device.", true);
   });
   els.addBtn.addEventListener("click", async () => {
-    const title = els.titleInput.value.trim();
-    if (!title) {
+    const name = els.nameInput.value.trim();
+    const qty = Number(els.qtyInput.value || 0);
+    if (!name) {
       return;
     }
-    await db.collection("todos").create({ title, completed: false, assignee: "You" });
-    els.titleInput.value = "";
-    await refreshView();
-    setStatus(network.isOnline() ? "Created locally (will sync soon)." : "Created offline \u2014 queued.");
+    await db.collection("stock").create({
+      name,
+      qty: Number.isFinite(qty) ? qty : 0,
+      sku: `SKU-${Math.floor(1e3 + Math.random() * 9e3)}`,
+      aisle: "A1"
+    });
+    els.nameInput.value = "";
+    els.qtyInput.value = "1";
+    await refreshAll();
+    setStatus(
+      network.isOnline() ? "Created on device \u2014 sync will push it to the remote API." : "Created offline \u2014 sitting in the outbox until you go online."
+    );
   });
-  els.titleInput.addEventListener("keydown", (event) => {
+  els.nameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       els.addBtn.click();
     }
   });
   network.subscribe((state) => {
     els.onlineToggle.checked = state.online;
-    els.onlineLabel.textContent = state.online ? "Online" : "Offline";
+    updateLinkUi(state.online);
+    void refreshAll();
   });
+}
+function wireEvents() {
+  for (const dispose of eventDisposers) {
+    dispose();
+  }
+  eventDisposers = [
+    db.on("queue:add", () => {
+      void refreshAll();
+    }),
+    db.on("queue:complete", () => {
+      void refreshAll();
+    }),
+    db.on("sync:start", () => {
+      els.flow?.classList.add("is-syncing");
+    }),
+    db.on("sync:end", () => {
+      els.flow?.classList.remove("is-syncing");
+      void refreshAll();
+    }),
+    db.on("conflict", (context) => {
+      setStatus(
+        `Conflict on ${context.collection}: device and remote disagreed \u2014 strategy ${String(conflictStrategy)} applied.`
+      );
+      void refreshAll();
+    })
+  ];
 }
 async function bindCollection() {
   unsubscribe?.();
-  const todos = db.collection("todos");
-  unsubscribe = todos.subscribe(async () => {
-    await refreshView();
+  const stock = db.collection("stock");
+  unsubscribe = stock.subscribe(async () => {
+    await refreshAll();
   });
-  await refreshView();
+  await refreshAll();
 }
 async function recreateDb(message, clearLocal = false) {
   unsubscribe?.();
+  for (const dispose of eventDisposers) {
+    dispose();
+  }
+  eventDisposers = [];
   panel.destroy();
+  await db.destroy();
   if (clearLocal && "indexedDB" in globalThis) {
     await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("offlinejs-demo");
+      const request = indexedDB.deleteDatabase(DB_NAME);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error ?? new Error("Failed to delete demo DB"));
       request.onblocked = () => resolve();
     });
   }
+  storage = createIndexedDBStorage({ databaseName: DB_NAME });
   db = createDemoDb();
   panel = createDevtoolsController(db);
   panel.mount(els.devtools);
+  wireEvents();
   await bindCollection();
   await pullIfOnline();
-  renderServerMeta();
+  await refreshAll();
   setStatus(message);
 }
 async function pullIfOnline() {
@@ -2076,56 +2135,133 @@ async function pullIfOnline() {
   await refreshLocalFromServer();
 }
 async function refreshLocalFromServer() {
-  await db.collection("todos").sync();
-  await refreshView();
+  await db.collection("stock").sync();
 }
-async function refreshView() {
-  const todos = await db.collection("todos").find({ orderBy: "updatedAt", sort: "desc" });
-  els.list.innerHTML = todos.length ? todos.map(
-    (todo) => `
-          <li class="demo-item" data-id="${escapeHtml2(todo.id)}">
-            <label class="demo-item-main">
-              <input type="checkbox" data-action="toggle" ${todo.completed ? "checked" : ""} />
-              <span class="${todo.completed ? "is-done" : ""}">${escapeHtml2(todo.title)}</span>
-            </label>
-            <div class="demo-item-meta">
-              <span>${escapeHtml2(todo.assignee ?? "Unassigned")}</span>
-              <button type="button" data-action="edit">Edit</button>
-              <button type="button" data-action="delete" class="danger">Delete</button>
+async function refreshAll() {
+  const [local, queue] = await Promise.all([
+    db.collection("stock").find({ orderBy: "name", sort: "asc" }),
+    storage.find(QUEUE_COLLECTION)
+  ]);
+  const remote = api.list();
+  const pending = queue.filter((item) => item.status === "pending" || item.status === "processing" || item.status === "failed").sort((a, b) => a.createdAt - b.createdAt);
+  renderDevice(local, remote, pending);
+  renderOutbox(pending);
+  renderServer(remote, local);
+  updateLinkUi(network.isOnline());
+}
+function renderDevice(local, remote, pending) {
+  const pendingIds = new Set(pending.map((item) => item.recordId));
+  const remoteById = new Map(remote.map((item) => [item.id, item]));
+  els.deviceMeta.textContent = `${local.length} item${local.length === 1 ? "" : "s"} in IndexedDB on this device`;
+  els.deviceList.innerHTML = local.length ? local.map((item) => {
+    const server = remoteById.get(item.id);
+    const diverged = server ? server.qty !== item.qty || server.aisle !== item.aisle : false;
+    const state = pendingIds.has(item.id) ? "queued" : !server ? "local-only" : diverged ? "diverged" : "synced";
+    return `
+          <article class="stock-card state-${state}" data-id="${escapeHtml2(item.id)}">
+            <header>
+              <div>
+                <strong>${escapeHtml2(item.name)}</strong>
+                <span class="stock-sku">${escapeHtml2(item.sku)} \xB7 aisle ${escapeHtml2(item.aisle)}</span>
+              </div>
+              <span class="stock-badge">${labelForState(state)}</span>
+            </header>
+            <div class="stock-qty-row">
+              <button type="button" data-action="dec" aria-label="Decrease quantity">\u2212</button>
+              <span class="stock-qty">${item.qty}</span>
+              <button type="button" data-action="inc" aria-label="Increase quantity">+</button>
             </div>
-          </li>`
-  ).join("") : `<li class="demo-empty">No local todos yet. Seed random data or add one.</li>`;
-  els.list.querySelectorAll(".demo-item").forEach((item) => {
-    const id = item.dataset.id;
-    item.querySelector('[data-action="toggle"]')?.addEventListener("change", async (event) => {
-      const checked = event.target.checked;
-      await db.collection("todos").update(id, { completed: checked });
-      await refreshView();
+            ${diverged && server ? `<p class="stock-diff">Remote still shows <strong>${server.qty}</strong> in ${escapeHtml2(server.aisle)}</p>` : ""}
+            <div class="stock-actions">
+              <button type="button" data-action="rename">Rename</button>
+              <button type="button" data-action="delete" class="danger">Remove</button>
+            </div>
+          </article>`;
+  }).join("") : `<p class="demo-empty">Nothing on this device yet. Seed the remote API, or add a line below.</p>`;
+  els.deviceList.querySelectorAll(".stock-card").forEach((card) => {
+    const id = card.dataset.id;
+    const item = local.find((row) => row.id === id);
+    if (!item) {
+      return;
+    }
+    card.querySelector('[data-action="inc"]')?.addEventListener("click", async () => {
+      await db.collection("stock").update(id, { qty: item.qty + 1 });
+      await refreshAll();
+      setStatus(`Device qty for ${item.name} \u2192 ${item.qty + 1}`);
     });
-    item.querySelector('[data-action="edit"]')?.addEventListener("click", async () => {
-      const current = todos.find((todo) => todo.id === id);
-      const next = globalThis.prompt("Edit title", current?.title ?? "");
+    card.querySelector('[data-action="dec"]')?.addEventListener("click", async () => {
+      await db.collection("stock").update(id, { qty: Math.max(0, item.qty - 1) });
+      await refreshAll();
+      setStatus(`Device qty for ${item.name} \u2192 ${Math.max(0, item.qty - 1)}`);
+    });
+    card.querySelector('[data-action="rename"]')?.addEventListener("click", async () => {
+      const next = globalThis.prompt("Rename stock item", item.name);
       if (!next) {
         return;
       }
-      await db.collection("todos").update(id, { title: next });
-      await refreshView();
+      await db.collection("stock").update(id, { name: next });
+      await refreshAll();
     });
-    item.querySelector('[data-action="delete"]')?.addEventListener("click", async () => {
-      await db.collection("todos").delete(id);
-      await refreshView();
+    card.querySelector('[data-action="delete"]')?.addEventListener("click", async () => {
+      await db.collection("stock").delete(id);
+      await refreshAll();
     });
   });
-  const queued = await db.collection("todos").find().then(async () => {
-    return api.list().length;
-  });
-  void queued;
-  const localCount = todos.length;
-  els.queueMeta.textContent = `${localCount} local todo${localCount === 1 ? "" : "s"} \xB7 network ${network.isOnline() ? "online" : "offline"} \xB7 strategy ${String(conflictStrategy)}`;
 }
-function renderServerMeta() {
-  const server = api.list();
-  els.serverMeta.textContent = `Fake API has ${server.length} todo${server.length === 1 ? "" : "s"} (random seed + synced writes).`;
+function renderOutbox(pending) {
+  els.outboxMeta.textContent = pending.length === 0 ? "Outbox empty \u2014 device and remote are caught up" : `${pending.length} mutation${pending.length === 1 ? "" : "s"} waiting to sync`;
+  els.outboxList.innerHTML = pending.length ? pending.map(
+    (mutation) => `
+        <article class="outbox-card status-${escapeHtml2(mutation.status)}">
+          <div class="outbox-op">${escapeHtml2(mutation.operation)}</div>
+          <div>
+            <strong>${escapeHtml2(String(mutation.payload?.name ?? mutation.recordId))}</strong>
+            <span class="stock-sku">${escapeHtml2(mutation.collection)} \xB7 ${escapeHtml2(mutation.status)}</span>
+            ${mutation.payload?.qty !== void 0 ? `<span class="outbox-qty">qty \u2192 ${Number(mutation.payload.qty)}</span>` : ""}
+          </div>
+        </article>`
+  ).join("") : `<p class="demo-empty">No pending writes. Change a quantity while offline to see the queue.</p>`;
+  els.outboxList.classList.toggle("has-items", pending.length > 0);
+}
+function renderServer(remote, local) {
+  const localById = new Map(local.map((item) => [item.id, item]));
+  els.serverMeta.textContent = `${remote.length} item${remote.length === 1 ? "" : "s"} on the fake warehouse API`;
+  els.serverList.innerHTML = remote.length ? remote.map((item) => {
+    const device = localById.get(item.id);
+    const diverged = device ? device.qty !== item.qty : false;
+    return `
+          <article class="stock-card server-card ${diverged ? "state-diverged" : "state-synced"}">
+            <header>
+              <div>
+                <strong>${escapeHtml2(item.name)}</strong>
+                <span class="stock-sku">${escapeHtml2(item.sku)} \xB7 aisle ${escapeHtml2(item.aisle)}</span>
+              </div>
+              <span class="stock-badge">${device ? diverged ? "ahead of device" : "mirrored" : "remote only"}</span>
+            </header>
+            <div class="stock-qty-row readonly">
+              <span class="stock-qty">${item.qty}</span>
+            </div>
+            ${diverged && device ? `<p class="stock-diff">Device still shows <strong>${device.qty}</strong></p>` : ""}
+          </article>`;
+  }).join("") : `<p class="demo-empty">Remote warehouse is empty. Seed random stock to begin.</p>`;
+}
+function updateLinkUi(online) {
+  els.onlineLabel.textContent = online ? "Online" : "Offline";
+  els.linkState.textContent = online ? "link open" : "link cut";
+  els.linkState.dataset.state = online ? "online" : "offline";
+  document.body.dataset.demoLink = online ? "online" : "offline";
+}
+function labelForState(state) {
+  switch (state) {
+    case "queued":
+      return "in outbox";
+    case "local-only":
+      return "device only";
+    case "diverged":
+      return "out of sync";
+    default:
+      return "synced";
+  }
 }
 function setStatus(message) {
   els.status.textContent = message;
