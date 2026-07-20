@@ -293,7 +293,7 @@ media.on("complete", ({ id, url }) => {});
 await media.enqueue(file);
 ```
 
-See [Media queue](media-queue.html) for server headers, resume, and API.
+See [Media queue](media-queue.html) for server headers, resume, API, and the **shipped vs hard-parts** status (video compress, tus/S3, iOS background, quotas).
 
 ## Next steps
 

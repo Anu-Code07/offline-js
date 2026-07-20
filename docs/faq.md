@@ -52,6 +52,8 @@ await media.enqueue(file); // instant UI; upload when online
 
 See [Media queue](media-queue.html).
 
+**Scope today:** photos / images are first-class (compress + resume). Video compression, tus/S3 multipart, iOS background upload, and quota handling are **not** shipped yet — see the status table on that page.
+
 ## Which package should I install?
 
 Start with `@offlinejs/client` — one import for `createOfflineDB`, storage presets, sync, React hooks, and common plugins.
