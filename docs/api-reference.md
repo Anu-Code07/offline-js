@@ -251,5 +251,6 @@ Wrap your tree in `OfflineProvider` with a `db` instance, then use `useOfflineCo
 
 - [Live demo](demo.html) — device → outbox → remote with DevTools
 - [Plugins](plugins.html) — deeper plugin APIs
+- [HTTP cache](cache.html) — TTL GET/JSON caching (`cachedJson`)
 - [AI.md](ai.html) — paste into Cursor / Copilot / ChatGPT to implement OfflineJS
 - [Sync engine](sync.html) · [Storage](storage.html) · [Performance](performance.html)

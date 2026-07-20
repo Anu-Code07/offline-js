@@ -1,5 +1,41 @@
 # FAQ
 
+## What is OfflineJS for? (PMF in plain words)
+
+OfflineJS is for apps that must **keep working when the network is bad**:
+
+- User taps Save → data lands on the device immediately  
+- Changes go into a **durable outbox**  
+- When online, OfflineJS **syncs** to your API and resolves **conflicts**
+
+That is **offline-first product data** (stock counts, checklists, CRM rows, forms) — not a generic website speed trick.
+
+**Great fit:** field/ops apps, PWAs, multi-device edits, anything where lost writes hurt.  
+**Weak fit:** pure content sites, “make this GET 200ms faster” alone, or server-authoritative every click.
+
+## Can I use OfflineJS for caching?
+
+**Yes for app records** — collections in IndexedDB act like a durable local cache you can read instantly.
+
+**For general HTTP caching** (TTL, stale-while-revalidate, Cache API), use the dedicated cache helpers:
+
+```ts
+import { cachedJson, createIndexedDBHttpCache } from "@offlinejs/client";
+
+const store = createIndexedDBHttpCache();
+const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
+  store,
+  ttlMs: 60_000,
+  staleWhileRevalidateMs: 30_000
+});
+```
+
+| Need | Tool |
+| --- | --- |
+| Offline writes + sync + conflicts | `createOfflineDB` |
+| Cache GET/JSON responses with TTL | `cachedJson` / `cachedFetch` (`@offlinejs/cache`) |
+| Cache static assets (JS/CSS/images) | Service Worker + Cache API (`createCacheApiStore`) |
+
 ## Which package should I install?
 
 Start with `@offlinejs/client` — one import for `createOfflineDB`, storage presets, sync, React hooks, and common plugins.

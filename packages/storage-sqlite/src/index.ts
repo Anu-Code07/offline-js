@@ -337,7 +337,7 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
     const complete = indexSatisfiesQuery(match, query);
 
     if (complete) {
-      const { offset, limit } = queryPageWindow(query);
+      const { offset, limit } = queryPageWindow(query as Parameters<typeof queryPageWindow>[0]);
       rows = limit === undefined ? rows.slice(offset) : rows.slice(offset, offset + limit);
     }
 
@@ -409,8 +409,75 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
 export const createSQLiteStorage = (options: SQLiteStorageOptions): SQLiteStorageAdapter =>
   new SQLiteStorageAdapter(options);
 
-export {
-  createBetterSqlite3Driver,
-  createBetterSqlite3DriverAsync,
-  type BetterSqlite3Database
-} from "./better-sqlite3";
+export interface BetterSqlite3Database {
+  prepare(sql: string): {
+    run: (...params: unknown[]) => unknown;
+    all: (...params: unknown[]) => unknown[];
+  };
+  exec(sql: string): unknown;
+  transaction<TValue>(fn: () => TValue): () => TValue;
+  close?: () => void;
+}
+
+/**
+ * Wrap a better-sqlite3 Database as an OfflineJS SQLiteDriver.
+ * Install optionally: `pnpm add better-sqlite3`
+ */
+export const createBetterSqlite3Driver = (database: BetterSqlite3Database): SQLiteDriver => ({
+  async execute(sql: string, params: unknown[] = []) {
+    if (/^\s*CREATE\b/i.test(sql) && !params.length) {
+      database.exec(sql);
+      return;
+    }
+    database.prepare(sql).run(...params);
+  },
+  async query<TValue = unknown>(sql: string, params: unknown[] = []) {
+    return database.prepare(sql).all(...params) as TValue[];
+  },
+  async transaction<TValue>(run: () => Promise<TValue>) {
+    const wrapped = database.transaction(() => {
+      let result!: TValue;
+      let error: unknown;
+      let settled = false;
+      void Promise.resolve(run())
+        .then((value) => {
+          result = value;
+          settled = true;
+        })
+        .catch((reason) => {
+          error = reason;
+          settled = true;
+        });
+      if (!settled) {
+        throw new Error(
+          "better-sqlite3 transactions require synchronous work; use await outside transaction or sync APIs"
+        );
+      }
+      if (error) {
+        throw error;
+      }
+      return result;
+    });
+    return wrapped();
+  }
+});
+
+/**
+ * Create a sync-friendly better-sqlite3 driver that runs OfflineJS SQL statements
+ * without nesting async work inside native transactions. Prefer this helper.
+ */
+export const createBetterSqlite3DriverAsync = (database: BetterSqlite3Database): SQLiteDriver => ({
+  async execute(sql: string, params: unknown[] = []) {
+    if (/^\s*CREATE\b/i.test(sql) && !params.length) {
+      database.exec(sql);
+      return;
+    }
+    database.prepare(sql).run(...params);
+  },
+  async query<TValue = unknown>(sql: string, params: unknown[] = []) {
+    return database.prepare(sql).all(...params) as TValue[];
+  },
+  async transaction<TValue>(run: () => Promise<TValue>) {
+    return run();
+  }
+});

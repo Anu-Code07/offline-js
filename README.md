@@ -365,6 +365,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | --- | --- |
 | [API reference](./docs/api-reference.md) | `createOfflineDB`, collections, events, **plugin catalog** |
 | [Plugins](./docs/plugins.md) | DevTools, auth, validation, encryption, coordination, SW |
+| [HTTP cache](./docs/cache.md) | TTL / stale-while-revalidate GET cache (`@offlinejs/cache`) |
 | [AI.md](./AI.md) | Paste into AI editors — copy-paste demos + hard rules |
 | [Best practices](./docs/best-practices.md) | Storage, sync, and production tips |
 | [Storage adapters](./docs/storage-adapters.md) | Choosing and configuring adapters |
