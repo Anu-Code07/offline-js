@@ -69,11 +69,13 @@
         <p class="section-kicker reveal">Install</p>
         <h2 class="section-title reveal">Ship the first offline collection today.</h2>
         <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
-        <pre class="code-panel reveal"><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb
+        <pre class="code-panel reveal"><code>pnpm add @offlinejs
+
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage()
+  storage: "indexeddb"
 });
 
 await db.collection("todos").create({ title: "Works offline" });</code></pre>

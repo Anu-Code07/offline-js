@@ -27,11 +27,18 @@
         <a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>API Reference</h1><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database.</p><pre><code>const db = createOfflineDB({
+        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs</code></pre><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database from the one-import package.</p><pre><code>import { createOfflineDB } from &quot;@offlinejs&quot;;
+
+const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
-  storage,
+  storage: &quot;indexeddb&quot;, // or &quot;memory&quot; | &quot;opfs&quot; | a custom adapter
   sync: { conflictStrategy: &quot;lastWriteWins&quot; }
-});</code></pre><h2>Collections</h2><pre><code>const users = db.collection(&quot;users&quot;);
+});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>&quot;indexeddb&quot;</code> in browsers and <code>&quot;memory&quot;</code> elsewhere.</p><p>Need a specialized helper? Import it from the same package:</p><pre><code>import {
+  createOfflineDB,
+  createAuthTransport,
+  createSQLiteStorage,
+  useOfflineCollection
+} from &quot;@offlinejs&quot;;</code></pre><p>Or import only that package when you want a smaller bundle:</p><pre><code>import { createSQLiteStorage } from &quot;@offlinejs/storage-sqlite&quot;;</code></pre><h2>Collections</h2><pre><code>const users = db.collection(&quot;users&quot;);
 
 await users.find({ limit: 20 });
 await users.findOne(id);

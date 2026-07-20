@@ -6,8 +6,7 @@
     "start": "tsx index.ts"
   },
   "dependencies": {
-    "@offlinejs/core": "workspace:*",
-    "@offlinejs/storage-memory": "workspace:*"
+    "@offlinejs": "workspace:*"
   },
   "devDependencies": {
     "tsx": "latest",

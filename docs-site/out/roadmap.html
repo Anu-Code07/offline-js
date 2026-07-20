@@ -151,9 +151,9 @@ app.post(&quot;/sync/push&quot;, async (req, res) =&gt; {
 
 app.get(&quot;/sync/pull&quot;, async (req, res) =&gt; {
   res.json(await handlePull(store, req.query));
-});</code></pre><h2>Suggested install sets</h2><p>Browser app:</p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network @offlinejs/react</code></pre><p>Hardened browser app:</p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network \
-  @offlinejs/validation @offlinejs/encryption @offlinejs/auth \
-  @offlinejs/service-worker @offlinejs/coordination @offlinejs/conflicts @offlinejs/react</code></pre><p>Node / tests:</p><p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-memory</code></pre>
+});</code></pre><h2>Suggested install sets</h2><p>Default (one package):</p><pre><code>pnpm add @offlinejs</code></pre><pre><code>import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from &quot;@offlinejs&quot;;</code></pre><p>Node / tests:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs&quot;;
+
+const db = createOfflineDB({ storage: &quot;memory&quot;, sync: { enabled: false } });</code></pre><p>Tree-shake a single advanced adapter when you want a minimal bundle:</p><p><pre><code>pnpm add @offlinejs/storage-sqlite</code></pre>
 </p>
       </article>
     </div>

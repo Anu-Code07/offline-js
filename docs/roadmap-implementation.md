@@ -188,22 +188,26 @@ app.get("/sync/pull", async (req, res) => {
 
 ## Suggested install sets
 
-Browser app:
+Default (one package):
 
 ```bash
-pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network @offlinejs/react
+pnpm add @offlinejs
 ```
 
-Hardened browser app:
-
-```bash
-pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network \
-  @offlinejs/validation @offlinejs/encryption @offlinejs/auth \
-  @offlinejs/service-worker @offlinejs/coordination @offlinejs/conflicts @offlinejs/react
+```ts
+import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from "@offlinejs";
 ```
 
 Node / tests:
 
+```ts
+import { createOfflineDB } from "@offlinejs";
+
+const db = createOfflineDB({ storage: "memory", sync: { enabled: false } });
+```
+
+Tree-shake a single advanced adapter when you want a minimal bundle:
+
 ```bash
-pnpm add @offlinejs/core @offlinejs/storage-memory
+pnpm add @offlinejs/storage-sqlite
 ```

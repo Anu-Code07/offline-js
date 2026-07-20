@@ -24,6 +24,7 @@
     { "path": "./packages/next" },
     { "path": "./packages/devtools" },
     { "path": "./packages/validation" },
-    { "path": "./packages/worker-sync" }
+    { "path": "./packages/worker-sync" },
+    { "path": "./packages/offlinejs" }
   ]
 }
