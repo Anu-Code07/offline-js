@@ -24,6 +24,7 @@ await esbuild.build({
     "@offlinejs/storage-sqlite": pkg("storage-sqlite"),
     "@offlinejs/react": pkg("react"),
     "@offlinejs/auth": pkg("auth"),
+    "@offlinejs/benchmarks": pkg("benchmarks"),
     "@offlinejs/validation": pkg("validation"),
     "@offlinejs/encryption": pkg("encryption"),
     "@offlinejs/service-worker": pkg("service-worker"),

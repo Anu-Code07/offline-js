@@ -128,11 +128,14 @@ export {
 
 // React
 export {
+  OfflineProvider,
   createOfflineExternalStore,
   useOfflineCollection,
-  useOfflineRecords
+  useOfflineDB,
+  useOfflineRecords,
+  useOfflineStatus
 } from "@offlinejs/react";
-export type { UseOfflineCollectionResult } from "@offlinejs/react";
+export type { OfflineStatus, UseOfflineCollectionResult } from "@offlinejs/react";
 
 // Auth / validation / encryption
 export { authPlugin, createAuthTransport } from "@offlinejs/auth";
@@ -140,17 +143,24 @@ export type { AuthTokenProvider, AuthTransportOptions } from "@offlinejs/auth";
 export {
   OfflineValidationError,
   assertValid,
+  composeValidators,
   createRequiredFieldsValidator,
+  createTypeValidator,
   createValidatedStorage,
   validationPlugin
 } from "@offlinejs/validation";
 export {
   createJsonEncryptionStorage,
-  createWebCryptoAesGcmCodec
+  createWebCryptoAesGcmCodec,
+  generateAesGcmKey
 } from "@offlinejs/encryption";
 
 // Plugins & advanced
-export { backgroundSyncPlugin, createOfflineSyncWorkerHandler } from "@offlinejs/service-worker";
+export {
+  backgroundSyncPlugin,
+  createOfflineSyncWorkerHandler,
+  registerOfflineServiceWorker
+} from "@offlinejs/service-worker";
 export {
   coordinationPlugin,
   createBroadcastCoordination
@@ -159,16 +169,25 @@ export {
   createFieldMergeResolver,
   mergeGrowOnlyCounter,
   mergeLastWriteWinsRegister,
-  mergeSetUnion
+  mergeOrMap,
+  mergeSetUnion,
+  mergeWithTombstones
 } from "@offlinejs/conflicts";
-export { createWorkerSyncHandler, createWorkerSyncPlugin } from "@offlinejs/worker-sync";
+export {
+  attachWorkerSyncRuntime,
+  createWorkerSyncHandler,
+  createWorkerSyncPlugin,
+  createWorkerSyncRuntime
+} from "@offlinejs/worker-sync";
 export { devtools } from "@offlinejs/devtools";
 export { createDevtoolsController } from "@offlinejs/devtools-ui";
 export {
+  createCacheTagRevalidator,
   createOfflineRouteClient,
   createServerActionSync,
   isServerRuntime,
-  offlineCacheTag
+  offlineCacheTag,
+  withOfflineCacheTags
 } from "@offlinejs/next";
 export {
   createPullRequest,
@@ -176,3 +195,10 @@ export {
   handlePull,
   handlePush
 } from "@offlinejs/sync-protocol";
+export {
+  benchmarkAdapterFind,
+  benchmarkAdapterWrites,
+  createBenchmarkRecord,
+  formatBenchmarkResult,
+  runAdapterBenchmarkSuite
+} from "@offlinejs/benchmarks";

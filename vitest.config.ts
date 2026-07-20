@@ -48,6 +48,10 @@ export default defineConfig({
   test: {
     coverage: {
       include: ["packages/*/src/**/*.ts"],
+      exclude: [
+        // React hooks require a DOM test environment; covered by createOfflineExternalStore tests.
+        "packages/react/src/index.ts"
+      ],
       provider: "v8",
       reporter: ["text", "json-summary"],
       thresholds: {

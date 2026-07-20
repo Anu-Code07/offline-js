@@ -77,6 +77,26 @@ describe("network", () => {
     });
   });
 
+  it("aborts requests that exceed the configured timeout", async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          });
+        })
+    );
+    const transport = new FetchTransport({
+      baseURL: "https://api.example.com",
+      fetch: fetchMock as unknown as typeof fetch,
+      timeoutMs: 5
+    });
+
+    await expect(transport.request({ method: "GET", path: "/slow" })).rejects.toMatchObject({
+      name: "AbortError"
+    });
+  });
+
   it("creates monitor and transport through factories", async () => {
     const monitor = createNetworkMonitor({ initialOnline: true });
     const transport = createFetchTransport({

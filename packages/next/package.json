@@ -1,7 +1,7 @@
 {
   "name": "@offlinejs/next",
   "version": "0.1.0",
-  "description": "Next.js integration package placeholder for OfflineJS.",
+  "description": "Next.js cache tags and server-action sync helpers for OfflineJS.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -31,5 +31,9 @@
   "devDependencies": {
     "tsup": "latest",
     "typescript": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

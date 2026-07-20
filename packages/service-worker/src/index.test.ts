@@ -3,7 +3,8 @@ import type { EventBus, NetworkMonitor, NetworkState, OfflineEvents } from "@off
 import {
   backgroundSyncPlugin,
   createOfflineSyncWorkerHandler,
-  createWorkerSyncMessage
+  createWorkerSyncMessage,
+  registerOfflineServiceWorker
 } from "./index";
 
 describe("service worker", () => {
@@ -96,5 +97,50 @@ describe("service worker", () => {
 
     await handler({});
     expect(sync).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores sync events with a different tag", async () => {
+    const sync = vi.fn(async () => {});
+    const handler = createOfflineSyncWorkerHandler(sync, { syncTag: "offlinejs-sync" });
+
+    await handler({ tag: "other-tag" });
+    expect(sync).not.toHaveBeenCalled();
+
+    await handler({ tag: "offlinejs-sync" });
+    expect(sync).toHaveBeenCalledOnce();
+  });
+
+  it("registers a service worker when the API is available", async () => {
+    const register = vi.fn(async () => ({ scope: "/" }));
+    const original = globalThis.navigator;
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: { serviceWorker: { register } }
+    });
+
+    try {
+      await expect(
+        registerOfflineServiceWorker({ scriptUrl: "/sw.js", scope: "/" })
+      ).resolves.toEqual({ scope: "/" });
+      expect(register).toHaveBeenCalledWith("/sw.js", { scope: "/" });
+      await expect(registerOfflineServiceWorker({ scriptUrl: "/sw.js" })).resolves.toEqual({
+        scope: "/"
+      });
+    } finally {
+      Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        value: original
+      });
+    }
+
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {}
+    });
+    await expect(registerOfflineServiceWorker({ scriptUrl: "/sw.js" })).resolves.toBeNull();
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: original
+    });
   });
 });

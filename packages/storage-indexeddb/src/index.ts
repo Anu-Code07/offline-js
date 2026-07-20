@@ -7,13 +7,29 @@ import {
   type StorageMigration,
   type TransactionStore
 } from "@offlinejs/types";
-import { applyQuery, clone } from "@offlinejs/utils";
+import {
+  applyQuery,
+  clone,
+  findMatchingIndex,
+  getEqualityFilterLookups,
+  readIndexFields,
+  serializeCompoundIndexValue
+} from "@offlinejs/utils";
 
 interface IndexedDBRow {
   collection: string;
   id: string;
   key: string;
   value: EntityRecord;
+}
+
+interface IndexEntryRow {
+  collection: string;
+  id: string;
+  indexName: string;
+  lookup: string;
+  recordId: string;
+  valueKey: string;
 }
 
 export interface IndexedDBStorageOptions {
@@ -23,7 +39,9 @@ export interface IndexedDBStorageOptions {
 
 const STORE_NAME = "records";
 const INDEX_STORE_NAME = "indexes";
+const INDEX_ENTRIES_STORE = "index_entries";
 const COLLECTION_INDEX = "collection";
+const LOOKUP_INDEX = "lookup";
 
 export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   readonly name = "indexeddb";
@@ -41,7 +59,7 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
 
   constructor(options: IndexedDBStorageOptions = {}) {
     this.databaseName = options.databaseName ?? "offlinejs";
-    this.version = options.version ?? 1;
+    this.version = options.version ?? 2;
   }
 
   async get<TRecord extends EntityRecord>(collection: string, id: string): Promise<TRecord | null> {
@@ -53,6 +71,13 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   }
 
   async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
+    const previous = await this.get(collection, value.id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
+
+    await this.assertUniqueIndexes(collection, value, previous?.id);
+
     const row: IndexedDBRow = {
       collection,
       id: value.id,
@@ -61,9 +86,14 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     };
 
     await this.request(this.store("readwrite").put(row));
+    await this.writeIndexEntries(collection, value);
   }
 
   async delete(collection: string, id: string): Promise<void> {
+    const previous = await this.get(collection, id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
     await this.request(this.store("readwrite").delete(this.key(collection, id)));
   }
 
@@ -71,17 +101,19 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     collection: string,
     query?: QueryOptions<TRecord>
   ): Promise<TRecord[]> {
-    const rows = await this.getCollectionRows(collection);
-    return applyQuery(
-      rows.map((row) => clone(row.value as TRecord)),
-      query
-    );
+    const indexed = await this.findViaIndex<TRecord>(collection, query);
+    const records =
+      indexed ??
+      (await this.getCollectionRows(collection)).map((row) => clone(row.value as TRecord));
+
+    return applyQuery(records, query);
   }
 
   async clear(collection?: string): Promise<void> {
     if (!collection) {
       await this.request(this.store("readwrite").clear());
       await this.request(this.indexStore("readwrite").clear());
+      await this.request(this.entryStore("readwrite").clear());
       return;
     }
 
@@ -94,21 +126,39 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
         this.request(this.indexStore("readwrite").delete(this.indexKey(collection, index.name)))
       )
     );
+
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries.map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
 
   async createIndex<TRecord extends EntityRecord>(
     definition: IndexDefinition<TRecord>
   ): Promise<void> {
+    const normalized = clone(definition as IndexDefinition);
     await this.request(
       this.indexStore("readwrite").put({
-        ...clone(definition as IndexDefinition),
+        ...normalized,
         id: this.indexKey(definition.collection, definition.name)
       })
     );
+
+    const rows = await this.getCollectionRows(definition.collection);
+    for (const row of rows) {
+      await this.assertUniqueIndexes(definition.collection, row.value);
+      await this.writeIndexEntries(definition.collection, row.value, [normalized]);
+    }
   }
 
   async dropIndex(collection: string, name: string): Promise<void> {
     await this.request(this.indexStore("readwrite").delete(this.indexKey(collection, name)));
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries
+        .filter((entry) => entry.indexName === name)
+        .map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
 
   async listIndexes(collection?: string): Promise<IndexDefinition[]> {
@@ -147,6 +197,96 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     }
   }
 
+  private async findViaIndex<TRecord extends EntityRecord>(
+    collection: string,
+    query?: QueryOptions<TRecord>
+  ): Promise<TRecord[] | null> {
+    const match = findMatchingIndex(
+      await this.listIndexes(collection),
+      getEqualityFilterLookups(query?.filters)
+    );
+
+    if (!match) {
+      return null;
+    }
+
+    const lookup = this.lookupKey(
+      collection,
+      match.index.name,
+      serializeCompoundIndexValue(match.values)
+    );
+    const entries = await this.request<IndexEntryRow[]>(
+      this.entryLookup("readonly").getAll(lookup)
+    );
+    const records: TRecord[] = [];
+
+    for (const entry of entries) {
+      const record = await this.get<TRecord>(collection, entry.recordId);
+      if (record) {
+        records.push(record);
+      }
+    }
+
+    return records;
+  }
+
+  private async assertUniqueIndexes(
+    collection: string,
+    record: EntityRecord,
+    ignoreId?: string
+  ): Promise<void> {
+    for (const definition of await this.listIndexes(collection)) {
+      if (!definition.unique) {
+        continue;
+      }
+
+      const lookup = this.lookupKey(
+        collection,
+        definition.name,
+        serializeCompoundIndexValue(readIndexFields(record, definition.fields))
+      );
+      const entries = await this.request<IndexEntryRow[]>(
+        this.entryLookup("readonly").getAll(lookup)
+      );
+
+      if (entries.some((entry) => entry.recordId !== record.id && entry.recordId !== ignoreId)) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+
+  private async writeIndexEntries(
+    collection: string,
+    record: EntityRecord,
+    definitions?: IndexDefinition[]
+  ): Promise<void> {
+    const indexes = definitions ?? (await this.listIndexes(collection));
+
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const entry: IndexEntryRow = {
+        collection,
+        id: this.entryId(collection, definition.name, valueKey, record.id),
+        indexName: definition.name,
+        lookup: this.lookupKey(collection, definition.name, valueKey),
+        recordId: record.id,
+        valueKey
+      };
+      await this.request(this.entryStore("readwrite").put(entry));
+    }
+  }
+
+  private async removeIndexEntries(collection: string, record: EntityRecord): Promise<void> {
+    for (const definition of await this.listIndexes(collection)) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      await this.request(
+        this.entryStore("readwrite").delete(
+          this.entryId(collection, definition.name, valueKey, record.id)
+        )
+      );
+    }
+  }
+
   private async getCollectionRows(collection: string): Promise<IndexedDBRow[]> {
     const database = await this.database();
     const transaction = database.transaction(STORE_NAME, "readonly");
@@ -155,52 +295,63 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     return this.request<IndexedDBRow[]>(index.getAll(collection));
   }
 
-  private store(mode: IDBTransactionMode): IDBObjectStore {
-    const databasePromise = this.database();
-    const requestProxy = {
-      get: (key: string) =>
-        databasePromise.then((database) =>
-          database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).get(key)
-        ),
-      put: (value: IndexedDBRow) =>
-        databasePromise.then((database) =>
-          database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).put(value)
-        ),
-      delete: (key: string) =>
-        databasePromise.then((database) =>
-          database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).delete(key)
-        ),
-      clear: () =>
-        databasePromise.then((database) =>
-          database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).clear()
-        )
-    };
+  private async getEntriesForCollection(collection: string): Promise<IndexEntryRow[]> {
+    const all = await this.request<IndexEntryRow[]>(this.entryStore("readonly").getAll());
+    return all.filter((entry) => entry.collection === collection);
+  }
 
-    return requestProxy as unknown as IDBObjectStore;
+  private store(mode: IDBTransactionMode): IDBObjectStore {
+    return this.objectStoreProxy(STORE_NAME, mode) as unknown as IDBObjectStore;
   }
 
   private indexStore(mode: IDBTransactionMode): IDBObjectStore {
+    return this.objectStoreProxy(INDEX_STORE_NAME, mode) as unknown as IDBObjectStore;
+  }
+
+  private entryStore(mode: IDBTransactionMode): IDBObjectStore {
+    return this.objectStoreProxy(INDEX_ENTRIES_STORE, mode) as unknown as IDBObjectStore;
+  }
+
+  private entryLookup(mode: IDBTransactionMode): {
+    getAll: (lookup: string) => Promise<IDBRequest<IndexEntryRow[]>>;
+  } {
     const databasePromise = this.database();
-    const requestProxy = {
-      put: (value: IndexDefinition & { id: string }) =>
+    return {
+      getAll: (lookup: string) =>
         databasePromise.then((database) =>
-          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).put(value)
+          database
+            .transaction(INDEX_ENTRIES_STORE, mode)
+            .objectStore(INDEX_ENTRIES_STORE)
+            .index(LOOKUP_INDEX)
+            .getAll(lookup)
+        )
+    };
+  }
+
+  private objectStoreProxy(storeName: string, mode: IDBTransactionMode) {
+    const databasePromise = this.database();
+    return {
+      get: (key: string) =>
+        databasePromise.then((database) =>
+          database.transaction(storeName, mode).objectStore(storeName).get(key)
+        ),
+      put: (value: unknown) =>
+        databasePromise.then((database) =>
+          database.transaction(storeName, mode).objectStore(storeName).put(value)
         ),
       delete: (key: string) =>
         databasePromise.then((database) =>
-          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).delete(key)
+          database.transaction(storeName, mode).objectStore(storeName).delete(key)
         ),
       clear: () =>
         databasePromise.then((database) =>
-          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).clear()
+          database.transaction(storeName, mode).objectStore(storeName).clear()
         ),
       getAll: () =>
         databasePromise.then((database) =>
-          database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).getAll()
+          database.transaction(storeName, mode).objectStore(storeName).getAll()
         )
     };
-
-    return requestProxy as unknown as IDBObjectStore;
   }
 
   private async database(): Promise<IDBDatabase> {
@@ -224,6 +375,11 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
         }
         if (!database.objectStoreNames.contains(INDEX_STORE_NAME)) {
           database.createObjectStore(INDEX_STORE_NAME, { keyPath: "id" });
+        }
+        if (!database.objectStoreNames.contains(INDEX_ENTRIES_STORE)) {
+          const entries = database.createObjectStore(INDEX_ENTRIES_STORE, { keyPath: "id" });
+          entries.createIndex(LOOKUP_INDEX, LOOKUP_INDEX, { unique: false });
+          entries.createIndex(COLLECTION_INDEX, COLLECTION_INDEX, { unique: false });
         }
       };
 
@@ -251,6 +407,19 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
 
   private indexKey(collection: string, name: string): string {
     return `${collection}:${name}`;
+  }
+
+  private lookupKey(collection: string, indexName: string, valueKey: string): string {
+    return `${collection}:${indexName}:${valueKey}`;
+  }
+
+  private entryId(
+    collection: string,
+    indexName: string,
+    valueKey: string,
+    recordId: string
+  ): string {
+    return `${collection}:${indexName}:${valueKey}:${recordId}`;
   }
 }
 

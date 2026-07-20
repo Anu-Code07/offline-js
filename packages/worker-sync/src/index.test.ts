@@ -6,7 +6,13 @@ import type {
   OfflineEvents,
   WorkerSyncMessage
 } from "@offlinejs/types";
-import { createWorkerSyncHandler, createWorkerSyncPlugin, type WorkerLike } from "./index";
+import {
+  attachWorkerSyncRuntime,
+  createWorkerSyncHandler,
+  createWorkerSyncPlugin,
+  createWorkerSyncRuntime,
+  type WorkerLike
+} from "./index";
 
 class FakeWorker implements WorkerLike {
   messages: WorkerSyncMessage[] = [];
@@ -67,5 +73,41 @@ describe("worker sync", () => {
     await handler({ id: "4", timestamp: 4, type: "sync" });
 
     expect(sync).toHaveBeenCalledTimes(1);
+  });
+
+  it("supports runtime shutdown and attach helpers", async () => {
+    const sync = vi.fn();
+    const runtime = createWorkerSyncRuntime({ sync } as never);
+    await runtime.handle({ id: "1", timestamp: 1, type: "resume" });
+    await runtime.handle({ id: "2", timestamp: 2, type: "sync" });
+    expect(sync).toHaveBeenCalledOnce();
+
+    await expect(runtime.handle({ id: "3", timestamp: 3, type: "shutdown" })).resolves.toMatchObject(
+      {
+        payload: { disposed: true, paused: true }
+      }
+    );
+    expect(runtime.isPaused()).toBe(true);
+
+    const responses: WorkerSyncMessage[] = [];
+    let listener: ((event: MessageEvent<WorkerSyncMessage>) => void) | undefined;
+    const dispose = attachWorkerSyncRuntime(
+      {
+        addEventListener(_type, next) {
+          listener = next;
+        },
+        postMessage(message) {
+          responses.push(message);
+        }
+      },
+      { sync: vi.fn() } as never
+    );
+
+    listener?.({
+      data: { id: "9", timestamp: 9, type: "status" }
+    } as MessageEvent<WorkerSyncMessage>);
+    await Promise.resolve();
+    expect(responses[0]?.type).toBe("status");
+    dispose();
   });
 });

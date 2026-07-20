@@ -100,6 +100,44 @@ var applyQuery = (records, query = {}) => {
   return sorted.slice(offset, offset + limit);
 };
 var countQuery = (records, query = {}) => records.filter((record) => matchesQuery(record, query)).length;
+var serializeCompoundIndexValue = (values) => JSON.stringify(values.map((value) => value ?? null));
+var readIndexFields = (record, fields) => fields.map((field) => record[String(field)]);
+var getEqualityFilterLookups = (filters) => {
+  if (!filters) {
+    return [];
+  }
+  const lookups = [];
+  for (const [field, expected] of Object.entries(filters)) {
+    if (expected === void 0) {
+      continue;
+    }
+    if (Array.isArray(expected) || expected === null || typeof expected !== "object") {
+      lookups.push({ field, value: expected });
+      continue;
+    }
+    if ("eq" in expected && expected.eq !== void 0) {
+      lookups.push({ field, value: expected.eq });
+    }
+  }
+  return lookups;
+};
+var findMatchingIndex = (indexes, lookups) => {
+  if (indexes.length === 0 || lookups.length === 0) {
+    return null;
+  }
+  const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
+  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
+  for (const index of ranked) {
+    const fields = index.fields.map(String);
+    if (fields.every((field) => lookupByField.has(field))) {
+      return {
+        index,
+        values: fields.map((field) => lookupByField.get(field))
+      };
+    }
+  }
+  return null;
+};
 var sortRecords = (records, query) => {
   if (!query.orderBy) {
     return [...records];
@@ -401,6 +439,8 @@ var MemoryStorageAdapter = class {
   };
   records = /* @__PURE__ */ new Map();
   indexes = /* @__PURE__ */ new Map();
+  /** collection → indexName → serializedValue → record ids */
+  secondary = /* @__PURE__ */ new Map();
   appliedMigrations = /* @__PURE__ */ new Set();
   constructor(options = {}) {
     this.name = options.name ?? "memory";
@@ -413,33 +453,54 @@ var MemoryStorageAdapter = class {
     return record ? clone(record) : null;
   }
   async set(collection, value) {
+    const previous = this.records.get(collection)?.get(value.id);
+    if (previous) {
+      this.unindexRecord(collection, previous);
+    }
+    this.assertUniqueIndexes(collection, value, previous?.id);
     this.ensureCollection(collection).set(value.id, clone(value));
+    this.indexRecord(collection, value);
   }
   async delete(collection, id) {
+    const previous = this.records.get(collection)?.get(id);
+    if (previous) {
+      this.unindexRecord(collection, previous);
+    }
     this.records.get(collection)?.delete(id);
   }
   async find(collection, query) {
-    const records = [...this.records.get(collection)?.values() ?? []].map(
-      (record) => clone(record)
-    );
+    const indexed = this.findViaIndex(collection, query);
+    const records = indexed ?? [...this.records.get(collection)?.values() ?? []].map((record) => clone(record));
     return applyQuery(records, query);
   }
   async clear(collection) {
     if (collection) {
       this.records.delete(collection);
       this.indexes.delete(collection);
+      this.secondary.delete(collection);
       return;
     }
     this.records.clear();
     this.indexes.clear();
+    this.secondary.clear();
   }
   async createIndex(definition) {
+    const normalized = clone(definition);
     const collectionIndexes = this.indexes.get(definition.collection) ?? /* @__PURE__ */ new Map();
-    collectionIndexes.set(definition.name, clone(definition));
+    collectionIndexes.set(definition.name, normalized);
     this.indexes.set(definition.collection, collectionIndexes);
+    const bucket = /* @__PURE__ */ new Map();
+    const collectionSecondary = this.secondary.get(definition.collection) ?? /* @__PURE__ */ new Map();
+    collectionSecondary.set(definition.name, bucket);
+    this.secondary.set(definition.collection, collectionSecondary);
+    for (const record of this.records.get(definition.collection)?.values() ?? []) {
+      this.assertUniqueIndexes(definition.collection, record);
+      this.addToSecondary(definition.collection, normalized, record);
+    }
   }
   async dropIndex(collection, name) {
     this.indexes.get(collection)?.delete(name);
+    this.secondary.get(collection)?.delete(name);
   }
   async listIndexes(collection) {
     if (collection) {
@@ -451,8 +512,20 @@ var MemoryStorageAdapter = class {
   }
   async transaction(scope, run) {
     const snapshot = /* @__PURE__ */ new Map();
+    const indexSnapshot = /* @__PURE__ */ new Map();
+    const secondarySnapshot = /* @__PURE__ */ new Map();
     for (const collection of scope) {
       snapshot.set(collection, new Map(this.records.get(collection) ?? []));
+      indexSnapshot.set(
+        collection,
+        new Map(
+          [...this.indexes.get(collection)?.entries() ?? []].map(([name, definition]) => [
+            name,
+            clone(definition)
+          ])
+        )
+      );
+      secondarySnapshot.set(collection, cloneSecondary(this.secondary.get(collection)));
     }
     try {
       return await run(this);
@@ -463,6 +536,18 @@ var MemoryStorageAdapter = class {
           this.records.set(collection, records);
         } else {
           this.records.delete(collection);
+        }
+        const indexes = indexSnapshot.get(collection);
+        if (indexes && indexes.size > 0) {
+          this.indexes.set(collection, indexes);
+        } else {
+          this.indexes.delete(collection);
+        }
+        const secondary = secondarySnapshot.get(collection);
+        if (secondary && secondary.size > 0) {
+          this.secondary.set(collection, secondary);
+        } else {
+          this.secondary.delete(collection);
         }
       }
       throw error;
@@ -479,6 +564,70 @@ var MemoryStorageAdapter = class {
       });
     }
   }
+  findViaIndex(collection, query) {
+    const definitions = [...this.indexes.get(collection)?.values() ?? []];
+    const match = findMatchingIndex(definitions, getEqualityFilterLookups(query?.filters));
+    if (!match) {
+      return null;
+    }
+    const valueKey = serializeCompoundIndexValue(match.values);
+    const ids = this.secondary.get(collection)?.get(match.index.name)?.get(valueKey);
+    if (!ids) {
+      return [];
+    }
+    const records = [];
+    for (const id of ids) {
+      const record = this.records.get(collection)?.get(id);
+      if (record) {
+        records.push(clone(record));
+      }
+    }
+    return records;
+  }
+  assertUniqueIndexes(collection, record, ignoreId) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      if (!definition.unique) {
+        continue;
+      }
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const ids = this.secondary.get(collection)?.get(definition.name)?.get(valueKey);
+      if (!ids) {
+        continue;
+      }
+      for (const id of ids) {
+        if (id !== record.id && id !== ignoreId) {
+          throw new Error(
+            `Unique index "${definition.name}" violated for ${collection}.${String(definition.fields[0])}`
+          );
+        }
+      }
+    }
+  }
+  indexRecord(collection, record) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      this.addToSecondary(collection, definition, record);
+    }
+  }
+  unindexRecord(collection, record) {
+    for (const definition of this.indexes.get(collection)?.values() ?? []) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = this.secondary.get(collection)?.get(definition.name)?.get(valueKey);
+      bucket?.delete(record.id);
+      if (bucket && bucket.size === 0) {
+        this.secondary.get(collection)?.get(definition.name)?.delete(valueKey);
+      }
+    }
+  }
+  addToSecondary(collection, definition, record) {
+    const collectionSecondary = this.secondary.get(collection) ?? /* @__PURE__ */ new Map();
+    const indexBucket = collectionSecondary.get(definition.name) ?? /* @__PURE__ */ new Map();
+    const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+    const ids = indexBucket.get(valueKey) ?? /* @__PURE__ */ new Set();
+    ids.add(record.id);
+    indexBucket.set(valueKey, ids);
+    collectionSecondary.set(definition.name, indexBucket);
+    this.secondary.set(collection, collectionSecondary);
+  }
   ensureCollection(collection) {
     const existing = this.records.get(collection);
     if (existing) {
@@ -488,6 +637,17 @@ var MemoryStorageAdapter = class {
     this.records.set(collection, records);
     return records;
   }
+};
+var cloneSecondary = (source) => {
+  const cloned = /* @__PURE__ */ new Map();
+  for (const [indexName, values] of source ?? []) {
+    const valueMap = /* @__PURE__ */ new Map();
+    for (const [valueKey, ids] of values) {
+      valueMap.set(valueKey, new Set(ids));
+    }
+    cloned.set(indexName, valueMap);
+  }
+  return cloned;
 };
 var createMemoryStorage = (options) => new MemoryStorageAdapter(options);
 
@@ -932,7 +1092,9 @@ var createOfflineDB = (options = {}) => new OfflineDatabase(options);
 // packages/storage-indexeddb/src/index.ts
 var STORE_NAME = "records";
 var INDEX_STORE_NAME = "indexes";
+var INDEX_ENTRIES_STORE = "index_entries";
 var COLLECTION_INDEX = "collection";
+var LOOKUP_INDEX = "lookup";
 var IndexedDBStorageAdapter = class {
   name = "indexeddb";
   contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
@@ -947,7 +1109,7 @@ var IndexedDBStorageAdapter = class {
   databasePromise;
   constructor(options = {}) {
     this.databaseName = options.databaseName ?? "offlinejs";
-    this.version = options.version ?? 1;
+    this.version = options.version ?? 2;
   }
   async get(collection, id) {
     const row = await this.request(
@@ -956,6 +1118,11 @@ var IndexedDBStorageAdapter = class {
     return row ? clone(row.value) : null;
   }
   async set(collection, value) {
+    const previous = await this.get(collection, value.id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
+    await this.assertUniqueIndexes(collection, value, previous?.id);
     const row = {
       collection,
       id: value.id,
@@ -963,21 +1130,25 @@ var IndexedDBStorageAdapter = class {
       value: clone(value)
     };
     await this.request(this.store("readwrite").put(row));
+    await this.writeIndexEntries(collection, value);
   }
   async delete(collection, id) {
+    const previous = await this.get(collection, id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
     await this.request(this.store("readwrite").delete(this.key(collection, id)));
   }
   async find(collection, query) {
-    const rows = await this.getCollectionRows(collection);
-    return applyQuery(
-      rows.map((row) => clone(row.value)),
-      query
-    );
+    const indexed = await this.findViaIndex(collection, query);
+    const records = indexed ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
+    return applyQuery(records, query);
   }
   async clear(collection) {
     if (!collection) {
       await this.request(this.store("readwrite").clear());
       await this.request(this.indexStore("readwrite").clear());
+      await this.request(this.entryStore("readwrite").clear());
       return;
     }
     const rows = await this.getCollectionRows(collection);
@@ -988,17 +1159,31 @@ var IndexedDBStorageAdapter = class {
         (index) => this.request(this.indexStore("readwrite").delete(this.indexKey(collection, index.name)))
       )
     );
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries.map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
   async createIndex(definition) {
+    const normalized = clone(definition);
     await this.request(
       this.indexStore("readwrite").put({
-        ...clone(definition),
+        ...normalized,
         id: this.indexKey(definition.collection, definition.name)
       })
     );
+    const rows = await this.getCollectionRows(definition.collection);
+    for (const row of rows) {
+      await this.assertUniqueIndexes(definition.collection, row.value);
+      await this.writeIndexEntries(definition.collection, row.value, [normalized]);
+    }
   }
   async dropIndex(collection, name) {
     await this.request(this.indexStore("readwrite").delete(this.indexKey(collection, name)));
+    const entries = await this.getEntriesForCollection(collection);
+    await Promise.all(
+      entries.filter((entry) => entry.indexName === name).map((entry) => this.request(this.entryStore("readwrite").delete(entry.id)))
+    );
   }
   async listIndexes(collection) {
     const rows = await this.request(
@@ -1025,47 +1210,120 @@ var IndexedDBStorageAdapter = class {
       await this.set("__migrations", { id: migration.name, appliedAt: Date.now() });
     }
   }
+  async findViaIndex(collection, query) {
+    const match = findMatchingIndex(
+      await this.listIndexes(collection),
+      getEqualityFilterLookups(query?.filters)
+    );
+    if (!match) {
+      return null;
+    }
+    const lookup = this.lookupKey(
+      collection,
+      match.index.name,
+      serializeCompoundIndexValue(match.values)
+    );
+    const entries = await this.request(
+      this.entryLookup("readonly").getAll(lookup)
+    );
+    const records = [];
+    for (const entry of entries) {
+      const record = await this.get(collection, entry.recordId);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async assertUniqueIndexes(collection, record, ignoreId) {
+    for (const definition of await this.listIndexes(collection)) {
+      if (!definition.unique) {
+        continue;
+      }
+      const lookup = this.lookupKey(
+        collection,
+        definition.name,
+        serializeCompoundIndexValue(readIndexFields(record, definition.fields))
+      );
+      const entries = await this.request(
+        this.entryLookup("readonly").getAll(lookup)
+      );
+      if (entries.some((entry) => entry.recordId !== record.id && entry.recordId !== ignoreId)) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+  async writeIndexEntries(collection, record, definitions) {
+    const indexes = definitions ?? await this.listIndexes(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const entry = {
+        collection,
+        id: this.entryId(collection, definition.name, valueKey, record.id),
+        indexName: definition.name,
+        lookup: this.lookupKey(collection, definition.name, valueKey),
+        recordId: record.id,
+        valueKey
+      };
+      await this.request(this.entryStore("readwrite").put(entry));
+    }
+  }
+  async removeIndexEntries(collection, record) {
+    for (const definition of await this.listIndexes(collection)) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      await this.request(
+        this.entryStore("readwrite").delete(
+          this.entryId(collection, definition.name, valueKey, record.id)
+        )
+      );
+    }
+  }
   async getCollectionRows(collection) {
     const database = await this.database();
     const transaction = database.transaction(STORE_NAME, "readonly");
     const index = transaction.objectStore(STORE_NAME).index(COLLECTION_INDEX);
     return this.request(index.getAll(collection));
   }
+  async getEntriesForCollection(collection) {
+    const all = await this.request(this.entryStore("readonly").getAll());
+    return all.filter((entry) => entry.collection === collection);
+  }
   store(mode) {
-    const databasePromise = this.database();
-    const requestProxy = {
-      get: (key) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).get(key)
-      ),
-      put: (value) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).put(value)
-      ),
-      delete: (key) => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).delete(key)
-      ),
-      clear: () => databasePromise.then(
-        (database) => database.transaction(STORE_NAME, mode).objectStore(STORE_NAME).clear()
-      )
-    };
-    return requestProxy;
+    return this.objectStoreProxy(STORE_NAME, mode);
   }
   indexStore(mode) {
+    return this.objectStoreProxy(INDEX_STORE_NAME, mode);
+  }
+  entryStore(mode) {
+    return this.objectStoreProxy(INDEX_ENTRIES_STORE, mode);
+  }
+  entryLookup(mode) {
     const databasePromise = this.database();
-    const requestProxy = {
-      put: (value) => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).put(value)
-      ),
-      delete: (key) => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).delete(key)
-      ),
-      clear: () => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).clear()
-      ),
-      getAll: () => databasePromise.then(
-        (database) => database.transaction(INDEX_STORE_NAME, mode).objectStore(INDEX_STORE_NAME).getAll()
+    return {
+      getAll: (lookup) => databasePromise.then(
+        (database) => database.transaction(INDEX_ENTRIES_STORE, mode).objectStore(INDEX_ENTRIES_STORE).index(LOOKUP_INDEX).getAll(lookup)
       )
     };
-    return requestProxy;
+  }
+  objectStoreProxy(storeName, mode) {
+    const databasePromise = this.database();
+    return {
+      get: (key) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).get(key)
+      ),
+      put: (value) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).put(value)
+      ),
+      delete: (key) => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).delete(key)
+      ),
+      clear: () => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).clear()
+      ),
+      getAll: () => databasePromise.then(
+        (database) => database.transaction(storeName, mode).objectStore(storeName).getAll()
+      )
+    };
   }
   async database() {
     if (this.databasePromise) {
@@ -1086,6 +1344,11 @@ var IndexedDBStorageAdapter = class {
         if (!database.objectStoreNames.contains(INDEX_STORE_NAME)) {
           database.createObjectStore(INDEX_STORE_NAME, { keyPath: "id" });
         }
+        if (!database.objectStoreNames.contains(INDEX_ENTRIES_STORE)) {
+          const entries = database.createObjectStore(INDEX_ENTRIES_STORE, { keyPath: "id" });
+          entries.createIndex(LOOKUP_INDEX, LOOKUP_INDEX, { unique: false });
+          entries.createIndex(COLLECTION_INDEX, COLLECTION_INDEX, { unique: false });
+        }
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error ?? new Error("Failed to open IndexedDB"));
@@ -1105,6 +1368,12 @@ var IndexedDBStorageAdapter = class {
   indexKey(collection, name) {
     return `${collection}:${name}`;
   }
+  lookupKey(collection, indexName, valueKey) {
+    return `${collection}:${indexName}:${valueKey}`;
+  }
+  entryId(collection, indexName, valueKey, recordId) {
+    return `${collection}:${indexName}:${valueKey}:${recordId}`;
+  }
 };
 var createIndexedDBStorage = (options) => new IndexedDBStorageAdapter(options);
 
@@ -1122,7 +1391,7 @@ var OPFSStorageAdapter = class {
   rootName;
   constructor(options = {}) {
     this.directory = options.directory;
-    this.rootName = options.rootName ?? "offlinejs";
+    this.rootName = options.rootName ?? options.rootDirectoryName ?? "offlinejs";
   }
   async get(collection, id) {
     try {
@@ -1133,31 +1402,37 @@ var OPFSStorageAdapter = class {
     }
   }
   async set(collection, value) {
+    const previous = await this.get(collection, value.id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
+    await this.assertUniqueIndexes(collection, value, previous?.id);
     const file = await this.file(collection, `${value.id}.json`, true);
     const writable = await file.createWritable();
     await writable.write(JSON.stringify(value));
     await writable.close();
     await this.updateManifest(collection, (ids) => [.../* @__PURE__ */ new Set([...ids, value.id])]);
+    await this.trackCollection(collection);
+    await this.writeIndexEntries(collection, value);
   }
   async delete(collection, id) {
+    const previous = await this.get(collection, id);
+    if (previous) {
+      await this.removeIndexEntries(collection, previous);
+    }
     await (await this.collectionDirectory(collection)).removeEntry(`${id}.json`);
     await this.updateManifest(collection, (ids) => ids.filter((value) => value !== id));
   }
   async find(collection, query) {
-    const manifest = await this.readManifest(collection);
-    const records = [];
-    for (const id of manifest.ids) {
-      const record = await this.get(collection, id);
-      if (record) {
-        records.push(record);
-      }
-    }
+    const indexed = await this.findViaIndex(collection, query);
+    const records = indexed ?? await this.loadAllRecords(collection);
     return applyQuery(records, query);
   }
   async clear(collection) {
     const root = await this.rootDirectory();
     if (collection) {
       await root.removeEntry(collection, { recursive: true });
+      await this.updateCollections((names) => names.filter((name) => name !== collection));
       return;
     }
     await root.removeEntry(this.rootName, { recursive: true });
@@ -1182,21 +1457,110 @@ var OPFSStorageAdapter = class {
     const nextIndexes = indexes.filter((index) => index.name !== definition.name);
     nextIndexes.push(definition);
     await this.writeIndexes(definition.collection, nextIndexes);
+    await this.trackCollection(definition.collection);
+    const data = await this.readIndexData(definition.collection);
+    data[definition.name] = {};
+    await this.writeIndexData(definition.collection, data);
+    for (const record of await this.loadAllRecords(definition.collection)) {
+      await this.assertUniqueIndexes(definition.collection, record);
+      await this.writeIndexEntries(definition.collection, record, [definition]);
+    }
   }
   async dropIndex(collection, name) {
     const indexes = (await this.listIndexes(collection)).filter((index) => index.name !== name);
     await this.writeIndexes(collection, indexes);
+    const data = await this.readIndexData(collection);
+    delete data[name];
+    await this.writeIndexData(collection, data);
   }
   async listIndexes(collection) {
-    if (!collection) {
-      return [];
+    if (collection) {
+      return this.readIndexes(collection);
     }
-    try {
-      const file = await this.file(collection, "__indexes.json");
-      return JSON.parse(await (await file.getFile()).text());
-    } catch {
-      return [];
+    const collections = await this.readCollections();
+    const indexes = [];
+    for (const name of collections) {
+      indexes.push(...await this.readIndexes(name));
     }
+    return indexes;
+  }
+  async findViaIndex(collection, query) {
+    const match = findMatchingIndex(
+      await this.listIndexes(collection),
+      getEqualityFilterLookups(query?.filters)
+    );
+    if (!match) {
+      return null;
+    }
+    const data = await this.readIndexData(collection);
+    const ids = data[match.index.name]?.[serializeCompoundIndexValue(match.values)] ?? [];
+    const records = [];
+    for (const id of ids) {
+      const record = await this.get(collection, id);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async loadAllRecords(collection) {
+    const manifest = await this.readManifest(collection);
+    const records = [];
+    for (const id of manifest.ids) {
+      const record = await this.get(collection, id);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
+  }
+  async assertUniqueIndexes(collection, record, ignoreId) {
+    const data = await this.readIndexData(collection);
+    for (const definition of await this.listIndexes(collection)) {
+      if (!definition.unique) {
+        continue;
+      }
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const ids = data[definition.name]?.[valueKey] ?? [];
+      if (ids.some((id) => id !== record.id && id !== ignoreId)) {
+        throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
+      }
+    }
+  }
+  async writeIndexEntries(collection, record, definitions) {
+    const indexes = definitions ?? await this.listIndexes(collection);
+    if (indexes.length === 0) {
+      return;
+    }
+    const data = await this.readIndexData(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = data[definition.name] ?? {};
+      const ids = new Set(bucket[valueKey] ?? []);
+      ids.add(record.id);
+      bucket[valueKey] = [...ids];
+      data[definition.name] = bucket;
+    }
+    await this.writeIndexData(collection, data);
+  }
+  async removeIndexEntries(collection, record) {
+    const indexes = await this.listIndexes(collection);
+    if (indexes.length === 0) {
+      return;
+    }
+    const data = await this.readIndexData(collection);
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = data[definition.name];
+      if (!bucket?.[valueKey]) {
+        continue;
+      }
+      bucket[valueKey] = bucket[valueKey].filter((id) => id !== record.id);
+      if (bucket[valueKey].length === 0) {
+        delete bucket[valueKey];
+      }
+    }
+    await this.writeIndexData(collection, data);
   }
   async file(collection, name, create = false) {
     return (await this.collectionDirectory(collection)).getFileHandle(name, { create });
@@ -1208,8 +1572,8 @@ var OPFSStorageAdapter = class {
     if (this.directory) {
       return this.directory.getDirectoryHandle(this.rootName, { create: true });
     }
-    const storage = globalThis.navigator?.storage;
-    const root = await storage?.getDirectory?.();
+    const storage2 = globalThis.navigator?.storage;
+    const root = await storage2?.getDirectory?.();
     if (!root) {
       throw new Error("OPFS is not available in this runtime");
     }
@@ -1223,10 +1587,52 @@ var OPFSStorageAdapter = class {
       return { ids: [] };
     }
   }
+  async readIndexes(collection) {
+    try {
+      const file = await this.file(collection, "__indexes.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return [];
+    }
+  }
   async writeIndexes(collection, indexes) {
     const file = await this.file(collection, "__indexes.json", true);
     const writable = await file.createWritable();
     await writable.write(JSON.stringify(indexes));
+    await writable.close();
+  }
+  async readIndexData(collection) {
+    try {
+      const file = await this.file(collection, "__index_data.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return {};
+    }
+  }
+  async writeIndexData(collection, data) {
+    const file = await this.file(collection, "__index_data.json", true);
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(data));
+    await writable.close();
+  }
+  async readCollections() {
+    try {
+      const root = await this.rootDirectory();
+      const file = await root.getFileHandle("__collections.json");
+      return JSON.parse(await (await file.getFile()).text());
+    } catch {
+      return [];
+    }
+  }
+  async trackCollection(collection) {
+    await this.updateCollections((names) => [.../* @__PURE__ */ new Set([...names, collection])]);
+  }
+  async updateCollections(update) {
+    const names = update(await this.readCollections());
+    const root = await this.rootDirectory();
+    const file = await root.getFileHandle("__collections.json", { create: true });
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(names));
     await writable.close();
   }
   async updateManifest(collection, update) {
@@ -1345,11 +1751,11 @@ var escapeHtml = (value) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;
 // packages/offlinejs/src/index.ts
 var isBrowserRuntime = () => typeof globalThis.window !== "undefined" && typeof globalThis.indexedDB !== "undefined";
 var isStorageAdapter = (value) => typeof value === "object" && value !== null && "get" in value && "set" in value;
-var resolveStorage = (storage) => {
-  if (isStorageAdapter(storage)) {
-    return storage;
+var resolveStorage = (storage2) => {
+  if (isStorageAdapter(storage2)) {
+    return storage2;
   }
-  const preset = storage ?? (isBrowserRuntime() ? "indexeddb" /* IndexedDB */ : "memory" /* Memory */);
+  const preset = storage2 ?? (isBrowserRuntime() ? "indexeddb" /* IndexedDB */ : "memory" /* Memory */);
   switch (preset) {
     case "memory" /* Memory */:
       return createMemoryStorage();
@@ -1363,56 +1769,61 @@ var resolveStorage = (storage) => {
   }
 };
 var createOfflineDB2 = (options = {}) => {
-  const { storage, ...rest } = options;
+  const { storage: storage2, ...rest } = options;
   return createOfflineDB({
     ...rest,
-    storage: resolveStorage(storage)
+    storage: resolveStorage(storage2)
   });
 };
 
 // docs-site/demo/fake-api.ts
-var TITLES = [
-  "Ship offline sync",
-  "Draft release notes",
-  "Fix flaky queue retry",
-  "Review conflict strategy",
-  "Polish demo UI",
-  "Add IndexedDB indexes",
-  "Write FAQ answer",
-  "Benchmark OPFS writes",
-  "Wire service worker sync",
-  "Tighten auth refresh"
+var NAMES = [
+  "Espresso beans",
+  "Oat milk",
+  "Paper cups",
+  "Cold brew concentrate",
+  "Sugar sticks",
+  "Croissant dough",
+  "Matcha powder",
+  "Ceramic mugs",
+  "Cleaning tablets",
+  "Vanilla syrup"
 ];
-var ASSIGNEES = ["Ada", "Grace", "Linus", "Margaret", "Alan", "Katherine"];
+var AISLES = ["A1", "A2", "B1", "B2", "C1", "Cold"];
 var randomItem = (items) => items[Math.floor(Math.random() * items.length)];
-var createId2 = () => globalThis.crypto?.randomUUID?.() ?? `todo_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-var FakeTodoApi = class {
+var createId2 = () => globalThis.crypto?.randomUUID?.() ?? `stock_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+var createSku = () => `SKU-${Math.floor(1e3 + Math.random() * 9e3)}`;
+var FakeStockApi = class {
   records = /* @__PURE__ */ new Map();
   conflictOnce = /* @__PURE__ */ new Set();
   constructor() {
     this.seedRandom(4);
   }
   list() {
-    return [...this.records.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...this.records.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+  get(id) {
+    return this.records.get(id) ?? null;
   }
   seedRandom(count = 5) {
     const created = [];
     for (let index = 0; index < count; index += 1) {
       const now2 = Date.now() - Math.floor(Math.random() * 5e4);
-      const todo = {
+      const item = {
         id: createId2(),
-        title: randomItem(TITLES),
-        completed: Math.random() > 0.65,
-        assignee: randomItem(ASSIGNEES),
+        sku: createSku(),
+        name: randomItem(NAMES),
+        qty: 4 + Math.floor(Math.random() * 24),
+        aisle: randomItem(AISLES),
         createdAt: now2,
         updatedAt: now2
       };
-      this.records.set(todo.id, todo);
-      created.push(todo);
+      this.records.set(item.id, item);
+      created.push(item);
     }
     return created;
   }
-  /** Mutate server copy and force the next client write to 409. */
+  /** Change the server copy and force the next client write to 409. */
   prepareConflict(id) {
     const current = this.records.get(id);
     if (!current) {
@@ -1420,8 +1831,8 @@ var FakeTodoApi = class {
     }
     const serverEdit = {
       ...current,
-      title: `SERVER: ${randomItem(TITLES)}`,
-      assignee: randomItem(ASSIGNEES),
+      qty: current.qty + 3 + Math.floor(Math.random() * 5),
+      aisle: randomItem(AISLES),
       updatedAt: Date.now() + 1
     };
     this.records.set(id, serverEdit);
@@ -1437,18 +1848,18 @@ var FakeTodoApi = class {
       contractVersion: SYNC_TRANSPORT_CONTRACT_VERSION,
       request: async (request) => {
         if (!isOnline()) {
-          const error = new Error("Fake API is offline");
+          const error = new Error("Remote warehouse API is offline");
           Object.assign(error, { status: 0 });
           throw error;
         }
-        await delay(120 + Math.floor(Math.random() * 180));
+        await delay(140 + Math.floor(Math.random() * 200));
         return this.handle(request);
       }
     };
   }
   async handle(request) {
     const [collection, id] = request.path.replace(/^\//, "").split("/");
-    if (collection !== "todos") {
+    if (collection !== "stock") {
       return { data: null, status: 404 };
     }
     if (request.method === "GET" && !id) {
@@ -1457,16 +1868,17 @@ var FakeTodoApi = class {
     if (request.method === "POST" && !id) {
       const body = request.body ?? {};
       const now2 = Date.now();
-      const todo = {
+      const item = {
         id: typeof body.id === "string" ? body.id : createId2(),
-        title: String(body.title ?? "Untitled"),
-        completed: Boolean(body.completed),
-        ...body.assignee ? { assignee: String(body.assignee) } : {},
+        sku: String(body.sku ?? createSku()),
+        name: String(body.name ?? "Untitled item"),
+        qty: Number(body.qty ?? 0),
+        aisle: String(body.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? now2),
         updatedAt: Number(body.updatedAt ?? now2)
       };
-      this.records.set(todo.id, todo);
-      return { data: todo, status: 201 };
+      this.records.set(item.id, item);
+      return { data: item, status: 201 };
     }
     if (!id) {
       return { data: null, status: 400 };
@@ -1487,9 +1899,10 @@ var FakeTodoApi = class {
       const now2 = Date.now();
       const next = {
         id,
-        title: String(body.title ?? existing?.title ?? "Untitled"),
-        completed: body.completed ?? existing?.completed ?? false,
-        ...body.assignee || existing?.assignee ? { assignee: String(body.assignee ?? existing?.assignee) } : {},
+        sku: String(body.sku ?? existing?.sku ?? createSku()),
+        name: String(body.name ?? existing?.name ?? "Untitled item"),
+        qty: Number(body.qty ?? existing?.qty ?? 0),
+        aisle: String(body.aisle ?? existing?.aisle ?? "A1"),
         createdAt: Number(body.createdAt ?? existing?.createdAt ?? now2),
         updatedAt: Number(body.updatedAt ?? now2)
       };
@@ -1504,31 +1917,41 @@ var delay = (ms) => new Promise((resolve) => {
 });
 
 // docs-site/demo/app.ts
-var api = new FakeTodoApi();
+var DB_NAME = "offlinejs-stock-demo";
+var QUEUE_COLLECTION = "__offline_queue";
+var api = new FakeStockApi();
 var network = new BrowserNetworkMonitor({ initialOnline: true });
+var storage = createIndexedDBStorage({ databaseName: DB_NAME });
 var conflictStrategy = "lastWriteWins" /* LastWriteWins */;
 var db = createDemoDb();
 var panel = createDevtoolsController(db);
 var unsubscribe;
+var eventDisposers = [];
 var els = {
   onlineToggle: document.querySelector("#online-toggle"),
   onlineLabel: document.querySelector("#online-label"),
+  linkState: document.querySelector("#link-state"),
   strategy: document.querySelector("#conflict-strategy"),
   seedBtn: document.querySelector("#seed-random"),
   syncBtn: document.querySelector("#sync-now"),
   conflictBtn: document.querySelector("#simulate-conflict"),
   resetBtn: document.querySelector("#reset-demo"),
-  titleInput: document.querySelector("#todo-title"),
-  addBtn: document.querySelector("#add-todo"),
-  list: document.querySelector("#todo-list"),
-  queueMeta: document.querySelector("#queue-meta"),
+  nameInput: document.querySelector("#item-name"),
+  qtyInput: document.querySelector("#item-qty"),
+  addBtn: document.querySelector("#add-item"),
+  deviceList: document.querySelector("#device-list"),
+  outboxList: document.querySelector("#outbox-list"),
+  serverList: document.querySelector("#server-list"),
+  deviceMeta: document.querySelector("#device-meta"),
+  outboxMeta: document.querySelector("#outbox-meta"),
   serverMeta: document.querySelector("#server-meta"),
   status: document.querySelector("#demo-status"),
+  flow: document.querySelector("#sync-flow"),
   devtools: document.querySelector("#offlinejs-devtools")
 };
 function createDemoDb() {
   return createOfflineDB2({
-    storage: createIndexedDBStorage({ databaseName: "offlinejs-demo" }),
+    storage,
     network,
     transport: api.createTransport(() => network.isOnline()),
     sync: {
@@ -1542,125 +1965,167 @@ function createDemoDb() {
 async function boot() {
   panel.mount(els.devtools);
   wireControls();
+  wireEvents();
   await bindCollection();
   await pullIfOnline();
-  renderServerMeta();
-  setStatus("Demo ready \u2014 try going offline, editing, then syncing.");
+  await refreshAll();
+  setStatus("Go offline, change a quantity, watch the outbox fill, then sync.");
 }
 function wireControls() {
   els.onlineToggle.checked = network.isOnline();
-  els.onlineLabel.textContent = network.isOnline() ? "Online" : "Offline";
+  updateLinkUi(network.isOnline());
   els.onlineToggle.addEventListener("change", () => {
     network.setOnline(els.onlineToggle.checked);
-    els.onlineLabel.textContent = els.onlineToggle.checked ? "Online" : "Offline";
-    setStatus(els.onlineToggle.checked ? "Back online \u2014 sync can resume." : "Offline \u2014 writes stay queued.");
+    updateLinkUi(els.onlineToggle.checked);
+    setStatus(
+      els.onlineToggle.checked ? "Link restored \u2014 outbox can flush to the remote API." : "Link cut \u2014 edits stay on this device and pile up in the outbox."
+    );
+    void refreshAll();
   });
   els.strategy.value = String(conflictStrategy);
   els.strategy.addEventListener("change", async () => {
     conflictStrategy = els.strategy.value;
-    await recreateDb(`Conflict strategy set to ${conflictStrategy}`);
+    await recreateDb(`Conflict strategy \u2192 ${conflictStrategy}`);
   });
   els.seedBtn.addEventListener("click", async () => {
-    const created = api.seedRandom(5);
+    const created = api.seedRandom(4);
     if (network.isOnline()) {
-      await db.collection("todos").sync();
+      await db.collection("stock").sync();
       await db.sync();
-    } else {
-    }
-    renderServerMeta();
-    if (network.isOnline()) {
       await refreshLocalFromServer();
     }
-    setStatus(`Fake API generated ${created.length} random todos.`);
+    await refreshAll();
+    setStatus(`Remote API seeded ${created.length} stock lines.`);
   });
   els.syncBtn.addEventListener("click", async () => {
     if (!network.isOnline()) {
-      setStatus("Can't sync while offline.");
+      setStatus("Can't sync while the link is offline.");
       return;
     }
-    setStatus("Syncing\u2026");
-    await db.collection("todos").sync();
-    await db.sync();
-    await refreshView();
-    renderServerMeta();
-    setStatus("Sync finished.");
+    setStatus("Flushing outbox \u2192 remote API\u2026");
+    els.flow?.classList.add("is-syncing");
+    try {
+      await db.collection("stock").sync();
+      await db.sync();
+      await refreshAll();
+      setStatus("Sync finished. Device and remote should match (unless a conflict remains).");
+    } finally {
+      els.flow?.classList.remove("is-syncing");
+    }
   });
   els.conflictBtn.addEventListener("click", async () => {
-    const local = await db.collection("todos").find({ limit: 1 });
+    const local = await db.collection("stock").find({ limit: 1 });
     const target = local[0];
     if (!target) {
-      setStatus("Add or seed a todo first, then sync it.");
+      setStatus("Add or seed stock first, then sync it once.");
       return;
     }
     if (network.isOnline()) {
-      await db.collection("todos").sync();
+      await db.collection("stock").sync();
     }
     const serverEdit = api.prepareConflict(target.id);
-    await db.collection("todos").update(target.id, {
-      title: `CLIENT: ${target.title}`,
-      completed: !target.completed
+    await db.collection("stock").update(target.id, {
+      qty: Math.max(0, target.qty - 2),
+      name: target.name
     });
-    renderServerMeta();
+    await refreshAll();
     setStatus(
-      serverEdit ? "Conflict prepared. Stay online and hit Sync to resolve with the dropdown strategy." : "Could not prepare conflict."
+      serverEdit ? `Conflict staged on ${target.name}: remote qty ${serverEdit.qty}, device qty ${Math.max(0, target.qty - 2)}. Sync to resolve.` : "Could not stage a conflict."
     );
-    await refreshView();
   });
   els.resetBtn.addEventListener("click", async () => {
     api.clear();
-    api.seedRandom(3);
-    await db.collection("todos").find().then(async (rows) => {
-      for (const row of rows) {
-        await db.collection("todos").delete(row.id);
-      }
-    });
-    await recreateDb("Demo reset with fresh random server data.", true);
+    api.seedRandom(4);
+    await recreateDb("Demo reset \u2014 fresh remote stock, empty device.", true);
   });
   els.addBtn.addEventListener("click", async () => {
-    const title = els.titleInput.value.trim();
-    if (!title) {
+    const name = els.nameInput.value.trim();
+    const qty = Number(els.qtyInput.value || 0);
+    if (!name) {
       return;
     }
-    await db.collection("todos").create({ title, completed: false, assignee: "You" });
-    els.titleInput.value = "";
-    await refreshView();
-    setStatus(network.isOnline() ? "Created locally (will sync soon)." : "Created offline \u2014 queued.");
+    await db.collection("stock").create({
+      name,
+      qty: Number.isFinite(qty) ? qty : 0,
+      sku: `SKU-${Math.floor(1e3 + Math.random() * 9e3)}`,
+      aisle: "A1"
+    });
+    els.nameInput.value = "";
+    els.qtyInput.value = "1";
+    await refreshAll();
+    setStatus(
+      network.isOnline() ? "Created on device \u2014 sync will push it to the remote API." : "Created offline \u2014 sitting in the outbox until you go online."
+    );
   });
-  els.titleInput.addEventListener("keydown", (event) => {
+  els.nameInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       els.addBtn.click();
     }
   });
   network.subscribe((state) => {
     els.onlineToggle.checked = state.online;
-    els.onlineLabel.textContent = state.online ? "Online" : "Offline";
+    updateLinkUi(state.online);
+    void refreshAll();
   });
+}
+function wireEvents() {
+  for (const dispose of eventDisposers) {
+    dispose();
+  }
+  eventDisposers = [
+    db.on("queue:add", () => {
+      void refreshAll();
+    }),
+    db.on("queue:complete", () => {
+      void refreshAll();
+    }),
+    db.on("sync:start", () => {
+      els.flow?.classList.add("is-syncing");
+    }),
+    db.on("sync:end", () => {
+      els.flow?.classList.remove("is-syncing");
+      void refreshAll();
+    }),
+    db.on("conflict", (context) => {
+      setStatus(
+        `Conflict on ${context.collection}: device and remote disagreed \u2014 strategy ${String(conflictStrategy)} applied.`
+      );
+      void refreshAll();
+    })
+  ];
 }
 async function bindCollection() {
   unsubscribe?.();
-  const todos = db.collection("todos");
-  unsubscribe = todos.subscribe(async () => {
-    await refreshView();
+  const stock = db.collection("stock");
+  unsubscribe = stock.subscribe(async () => {
+    await refreshAll();
   });
-  await refreshView();
+  await refreshAll();
 }
 async function recreateDb(message, clearLocal = false) {
   unsubscribe?.();
+  for (const dispose of eventDisposers) {
+    dispose();
+  }
+  eventDisposers = [];
   panel.destroy();
+  await db.destroy();
   if (clearLocal && "indexedDB" in globalThis) {
     await new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase("offlinejs-demo");
+      const request = indexedDB.deleteDatabase(DB_NAME);
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error ?? new Error("Failed to delete demo DB"));
       request.onblocked = () => resolve();
     });
   }
+  storage = createIndexedDBStorage({ databaseName: DB_NAME });
   db = createDemoDb();
   panel = createDevtoolsController(db);
   panel.mount(els.devtools);
+  wireEvents();
   await bindCollection();
   await pullIfOnline();
-  renderServerMeta();
+  await refreshAll();
   setStatus(message);
 }
 async function pullIfOnline() {
@@ -1670,56 +2135,133 @@ async function pullIfOnline() {
   await refreshLocalFromServer();
 }
 async function refreshLocalFromServer() {
-  await db.collection("todos").sync();
-  await refreshView();
+  await db.collection("stock").sync();
 }
-async function refreshView() {
-  const todos = await db.collection("todos").find({ orderBy: "updatedAt", sort: "desc" });
-  els.list.innerHTML = todos.length ? todos.map(
-    (todo) => `
-          <li class="demo-item" data-id="${escapeHtml2(todo.id)}">
-            <label class="demo-item-main">
-              <input type="checkbox" data-action="toggle" ${todo.completed ? "checked" : ""} />
-              <span class="${todo.completed ? "is-done" : ""}">${escapeHtml2(todo.title)}</span>
-            </label>
-            <div class="demo-item-meta">
-              <span>${escapeHtml2(todo.assignee ?? "Unassigned")}</span>
-              <button type="button" data-action="edit">Edit</button>
-              <button type="button" data-action="delete" class="danger">Delete</button>
+async function refreshAll() {
+  const [local, queue] = await Promise.all([
+    db.collection("stock").find({ orderBy: "name", sort: "asc" }),
+    storage.find(QUEUE_COLLECTION)
+  ]);
+  const remote = api.list();
+  const pending = queue.filter((item) => item.status === "pending" || item.status === "processing" || item.status === "failed").sort((a, b) => a.createdAt - b.createdAt);
+  renderDevice(local, remote, pending);
+  renderOutbox(pending);
+  renderServer(remote, local);
+  updateLinkUi(network.isOnline());
+}
+function renderDevice(local, remote, pending) {
+  const pendingIds = new Set(pending.map((item) => item.recordId));
+  const remoteById = new Map(remote.map((item) => [item.id, item]));
+  els.deviceMeta.textContent = `${local.length} item${local.length === 1 ? "" : "s"} in IndexedDB on this device`;
+  els.deviceList.innerHTML = local.length ? local.map((item) => {
+    const server = remoteById.get(item.id);
+    const diverged = server ? server.qty !== item.qty || server.aisle !== item.aisle : false;
+    const state = pendingIds.has(item.id) ? "queued" : !server ? "local-only" : diverged ? "diverged" : "synced";
+    return `
+          <article class="stock-card state-${state}" data-id="${escapeHtml2(item.id)}">
+            <header>
+              <div>
+                <strong>${escapeHtml2(item.name)}</strong>
+                <span class="stock-sku">${escapeHtml2(item.sku)} \xB7 aisle ${escapeHtml2(item.aisle)}</span>
+              </div>
+              <span class="stock-badge">${labelForState(state)}</span>
+            </header>
+            <div class="stock-qty-row">
+              <button type="button" data-action="dec" aria-label="Decrease quantity">\u2212</button>
+              <span class="stock-qty">${item.qty}</span>
+              <button type="button" data-action="inc" aria-label="Increase quantity">+</button>
             </div>
-          </li>`
-  ).join("") : `<li class="demo-empty">No local todos yet. Seed random data or add one.</li>`;
-  els.list.querySelectorAll(".demo-item").forEach((item) => {
-    const id = item.dataset.id;
-    item.querySelector('[data-action="toggle"]')?.addEventListener("change", async (event) => {
-      const checked = event.target.checked;
-      await db.collection("todos").update(id, { completed: checked });
-      await refreshView();
+            ${diverged && server ? `<p class="stock-diff">Remote still shows <strong>${server.qty}</strong> in ${escapeHtml2(server.aisle)}</p>` : ""}
+            <div class="stock-actions">
+              <button type="button" data-action="rename">Rename</button>
+              <button type="button" data-action="delete" class="danger">Remove</button>
+            </div>
+          </article>`;
+  }).join("") : `<p class="demo-empty">Nothing on this device yet. Seed the remote API, or add a line below.</p>`;
+  els.deviceList.querySelectorAll(".stock-card").forEach((card) => {
+    const id = card.dataset.id;
+    const item = local.find((row) => row.id === id);
+    if (!item) {
+      return;
+    }
+    card.querySelector('[data-action="inc"]')?.addEventListener("click", async () => {
+      await db.collection("stock").update(id, { qty: item.qty + 1 });
+      await refreshAll();
+      setStatus(`Device qty for ${item.name} \u2192 ${item.qty + 1}`);
     });
-    item.querySelector('[data-action="edit"]')?.addEventListener("click", async () => {
-      const current = todos.find((todo) => todo.id === id);
-      const next = globalThis.prompt("Edit title", current?.title ?? "");
+    card.querySelector('[data-action="dec"]')?.addEventListener("click", async () => {
+      await db.collection("stock").update(id, { qty: Math.max(0, item.qty - 1) });
+      await refreshAll();
+      setStatus(`Device qty for ${item.name} \u2192 ${Math.max(0, item.qty - 1)}`);
+    });
+    card.querySelector('[data-action="rename"]')?.addEventListener("click", async () => {
+      const next = globalThis.prompt("Rename stock item", item.name);
       if (!next) {
         return;
       }
-      await db.collection("todos").update(id, { title: next });
-      await refreshView();
+      await db.collection("stock").update(id, { name: next });
+      await refreshAll();
     });
-    item.querySelector('[data-action="delete"]')?.addEventListener("click", async () => {
-      await db.collection("todos").delete(id);
-      await refreshView();
+    card.querySelector('[data-action="delete"]')?.addEventListener("click", async () => {
+      await db.collection("stock").delete(id);
+      await refreshAll();
     });
   });
-  const queued = await db.collection("todos").find().then(async () => {
-    return api.list().length;
-  });
-  void queued;
-  const localCount = todos.length;
-  els.queueMeta.textContent = `${localCount} local todo${localCount === 1 ? "" : "s"} \xB7 network ${network.isOnline() ? "online" : "offline"} \xB7 strategy ${String(conflictStrategy)}`;
 }
-function renderServerMeta() {
-  const server = api.list();
-  els.serverMeta.textContent = `Fake API has ${server.length} todo${server.length === 1 ? "" : "s"} (random seed + synced writes).`;
+function renderOutbox(pending) {
+  els.outboxMeta.textContent = pending.length === 0 ? "Outbox empty \u2014 device and remote are caught up" : `${pending.length} mutation${pending.length === 1 ? "" : "s"} waiting to sync`;
+  els.outboxList.innerHTML = pending.length ? pending.map(
+    (mutation) => `
+        <article class="outbox-card status-${escapeHtml2(mutation.status)}">
+          <div class="outbox-op">${escapeHtml2(mutation.operation)}</div>
+          <div>
+            <strong>${escapeHtml2(String(mutation.payload?.name ?? mutation.recordId))}</strong>
+            <span class="stock-sku">${escapeHtml2(mutation.collection)} \xB7 ${escapeHtml2(mutation.status)}</span>
+            ${mutation.payload?.qty !== void 0 ? `<span class="outbox-qty">qty \u2192 ${Number(mutation.payload.qty)}</span>` : ""}
+          </div>
+        </article>`
+  ).join("") : `<p class="demo-empty">No pending writes. Change a quantity while offline to see the queue.</p>`;
+  els.outboxList.classList.toggle("has-items", pending.length > 0);
+}
+function renderServer(remote, local) {
+  const localById = new Map(local.map((item) => [item.id, item]));
+  els.serverMeta.textContent = `${remote.length} item${remote.length === 1 ? "" : "s"} on the fake warehouse API`;
+  els.serverList.innerHTML = remote.length ? remote.map((item) => {
+    const device = localById.get(item.id);
+    const diverged = device ? device.qty !== item.qty : false;
+    return `
+          <article class="stock-card server-card ${diverged ? "state-diverged" : "state-synced"}">
+            <header>
+              <div>
+                <strong>${escapeHtml2(item.name)}</strong>
+                <span class="stock-sku">${escapeHtml2(item.sku)} \xB7 aisle ${escapeHtml2(item.aisle)}</span>
+              </div>
+              <span class="stock-badge">${device ? diverged ? "ahead of device" : "mirrored" : "remote only"}</span>
+            </header>
+            <div class="stock-qty-row readonly">
+              <span class="stock-qty">${item.qty}</span>
+            </div>
+            ${diverged && device ? `<p class="stock-diff">Device still shows <strong>${device.qty}</strong></p>` : ""}
+          </article>`;
+  }).join("") : `<p class="demo-empty">Remote warehouse is empty. Seed random stock to begin.</p>`;
+}
+function updateLinkUi(online) {
+  els.onlineLabel.textContent = online ? "Online" : "Offline";
+  els.linkState.textContent = online ? "link open" : "link cut";
+  els.linkState.dataset.state = online ? "online" : "offline";
+  document.body.dataset.demoLink = online ? "online" : "offline";
+}
+function labelForState(state) {
+  switch (state) {
+    case "queued":
+      return "in outbox";
+    case "local-only":
+      return "device only";
+    case "diverged":
+      return "out of sync";
+    default:
+      return "synced";
+  }
 }
 function setStatus(message) {
   els.status.textContent = message;

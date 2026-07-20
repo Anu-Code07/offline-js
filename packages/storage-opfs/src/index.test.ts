@@ -82,4 +82,29 @@ describe("OPFSStorageAdapter", () => {
       "OPFS is not available"
     );
   });
+
+  it("accelerates equality filters and lists indexes across collections", async () => {
+    const storage = createOPFSStorage({
+      directory: new FakeDirectoryHandle(),
+      rootDirectoryName: "offlinejs-root"
+    });
+    await storage.set("users", { id: "1", name: "Ada" });
+    await storage.set("users", { id: "2", name: "Grace" });
+    await storage.createIndex({
+      collection: "users",
+      fields: ["name"],
+      name: "users_name",
+      unique: true
+    });
+
+    await expect(storage.find("users", { filters: { name: "Grace" } })).resolves.toEqual([
+      { id: "2", name: "Grace" }
+    ]);
+    await expect(storage.listIndexes()).resolves.toEqual([
+      { collection: "users", fields: ["name"], name: "users_name", unique: true }
+    ]);
+    await expect(
+      storage.set("users", { id: "3", name: "Ada" })
+    ).rejects.toThrow(/Unique index/);
+  });
 });

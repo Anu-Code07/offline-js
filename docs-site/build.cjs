@@ -251,15 +251,33 @@ function renderDemo() {
   const body = `
     <main class="demo-page">
       <section class="demo-hero">
-        <h1>Live offline sync demo</h1>
+        <h1>Watch the sync pipeline</h1>
         <p>
-          A tiny todos app on IndexedDB with a fake API that generates random data.
-          Toggle offline, queue writes, sync, and resolve conflicts — with the real
-          <code>@offlinejs/devtools</code> + <code>@offlinejs/devtools-ui</code> packages mounted below.
+          A warehouse stock board that makes OfflineJS visible: edit quantities on
+          <strong>this device</strong>, see writes land in the <strong>outbox</strong>,
+          then flush to the <strong>remote API</strong>. Cut the link, diverge quantities,
+          and resolve conflicts — with real <code>@offlinejs/devtools</code> events below.
         </p>
       </section>
 
       <p class="demo-status" id="demo-status">Starting demo…</p>
+
+      <section class="demo-flow" id="sync-flow" aria-label="Sync pipeline">
+        <div class="demo-flow-node" data-node="device">
+          <strong>This device</strong>
+          <span>IndexedDB</span>
+        </div>
+        <div class="demo-flow-arrow" aria-hidden="true">→</div>
+        <div class="demo-flow-node" data-node="outbox">
+          <strong>Outbox</strong>
+          <span>queued mutations</span>
+        </div>
+        <div class="demo-flow-arrow" aria-hidden="true">→</div>
+        <div class="demo-flow-node" data-node="remote">
+          <strong>Remote API</strong>
+          <span id="link-state" data-state="online">link open</span>
+        </div>
+      </section>
 
       <section class="demo-toolbar" aria-label="Demo controls">
         <label class="demo-toggle">
@@ -277,31 +295,43 @@ function renderDemo() {
           </select>
         </label>
 
-        <button class="button button-secondary" type="button" id="seed-random">Seed random API data</button>
-        <button class="button button-primary" type="button" id="sync-now">Sync now</button>
-        <button class="button button-secondary" type="button" id="simulate-conflict">Simulate conflict</button>
+        <button class="button button-secondary" type="button" id="seed-random">Seed remote stock</button>
+        <button class="button button-primary" type="button" id="sync-now">Flush outbox</button>
+        <button class="button button-secondary" type="button" id="simulate-conflict">Stage conflict</button>
         <button class="button button-secondary" type="button" id="reset-demo">Reset</button>
       </section>
 
-      <section class="demo-composer" aria-label="Add todo">
-        <input id="todo-title" type="text" placeholder="Add a todo…" />
-        <button class="button button-primary" type="button" id="add-todo">Add locally</button>
+      <section class="demo-composer" aria-label="Add stock item">
+        <input id="item-name" type="text" placeholder="New stock item (e.g. Oat milk)" />
+        <input id="item-qty" type="number" min="0" value="1" aria-label="Quantity" />
+        <button class="button button-primary" type="button" id="add-item">Add on device</button>
       </section>
 
-      <div class="demo-layout">
+      <div class="demo-pipeline">
         <section class="demo-panel">
-          <h2>Local collection</h2>
-          <p class="demo-meta" id="queue-meta">Loading local todos…</p>
-          <p class="demo-meta" id="server-meta">Fake API idle.</p>
-          <ul class="demo-list" id="todo-list"></ul>
+          <h2>1 · This device</h2>
+          <p class="demo-meta" id="device-meta">Loading IndexedDB…</p>
+          <div class="demo-stack" id="device-list"></div>
         </section>
 
         <section class="demo-panel">
-          <h2>Package Devtools</h2>
-          <p class="demo-meta">Live timeline from <code>createDevtoolsController(db).mount()</code>.</p>
-          <div class="demo-devtools" id="offlinejs-devtools"></div>
+          <h2>2 · Outbox</h2>
+          <p class="demo-meta" id="outbox-meta">Checking queue…</p>
+          <div class="demo-stack" id="outbox-list"></div>
+        </section>
+
+        <section class="demo-panel">
+          <h2>3 · Remote API</h2>
+          <p class="demo-meta" id="server-meta">Fake warehouse idle.</p>
+          <div class="demo-stack" id="server-list"></div>
         </section>
       </div>
+
+      <section class="demo-panel demo-devtools-wrap">
+        <h2>Package Devtools</h2>
+        <p class="demo-meta">Live timeline from <code>createDevtoolsController(db).mount()</code>.</p>
+        <div class="demo-devtools" id="offlinejs-devtools"></div>
+      </section>
     </main>
   `;
 

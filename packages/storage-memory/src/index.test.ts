@@ -38,6 +38,25 @@ describe("MemoryStorageAdapter", () => {
     await expect(storage.find("users")).resolves.toEqual([{ id: "1", name: "Ada" }]);
   });
 
+  it("accelerates equality filters through secondary indexes", async () => {
+    const storage = createMemoryStorage();
+    await storage.set("users", { id: "1", email: "ada@example.com", name: "Ada" });
+    await storage.set("users", { id: "2", email: "grace@example.com", name: "Grace" });
+    await storage.createIndex({
+      collection: "users",
+      fields: ["email"],
+      name: "users_email",
+      unique: true
+    });
+
+    await expect(
+      storage.find("users", { filters: { email: "grace@example.com" } })
+    ).resolves.toEqual([{ id: "2", email: "grace@example.com", name: "Grace" }]);
+    await expect(
+      storage.set("users", { id: "3", email: "ada@example.com", name: "Duplicate" })
+    ).rejects.toThrow(/Unique index/);
+  });
+
   it("stores secondary index metadata", async () => {
     const storage = createMemoryStorage();
 

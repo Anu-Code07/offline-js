@@ -2,7 +2,10 @@ import {
   STORAGE_ADAPTER_CONTRACT_VERSION,
   SYNC_TRANSPORT_CONTRACT_VERSION,
   type EntityRecord,
+  type IndexableStorageAdapter,
+  type IndexDefinition,
   type QueryFilterValue,
+  type QueryFilters,
   type QueryOptions,
   type StorageAdapter,
   type SyncTransport
@@ -164,6 +167,98 @@ export const countQuery = <TRecord extends EntityRecord>(
   records: TRecord[],
   query: QueryOptions<TRecord> = {}
 ): number => records.filter((record) => matchesQuery(record, query)).length;
+
+export const serializeIndexValue = (value: unknown): string => JSON.stringify(value ?? null);
+
+export const serializeCompoundIndexValue = (values: unknown[]): string =>
+  JSON.stringify(values.map((value) => value ?? null));
+
+export const readIndexFields = (record: EntityRecord, fields: Array<string | number | symbol>): unknown[] =>
+  fields.map((field) => record[String(field)]);
+
+export interface EqualityLookup {
+  field: string;
+  value: unknown;
+}
+
+/** Extract simple equality lookups that secondary indexes can accelerate. */
+export const getEqualityFilterLookups = <TRecord extends EntityRecord>(
+  filters?: QueryFilters<TRecord>
+): EqualityLookup[] => {
+  if (!filters) {
+    return [];
+  }
+
+  const lookups: EqualityLookup[] = [];
+
+  for (const [field, expected] of Object.entries(filters)) {
+    if (expected === undefined) {
+      continue;
+    }
+
+    if (Array.isArray(expected) || expected === null || typeof expected !== "object") {
+      lookups.push({ field, value: expected });
+      continue;
+    }
+
+    if ("eq" in expected && expected.eq !== undefined) {
+      lookups.push({ field, value: expected.eq });
+    }
+  }
+
+  return lookups;
+};
+
+export interface MatchedIndex {
+  index: IndexDefinition;
+  values: unknown[];
+}
+
+/** Prefer the most specific index whose fields are all covered by equality filters. */
+export const findMatchingIndex = (
+  indexes: IndexDefinition[],
+  lookups: EqualityLookup[]
+): MatchedIndex | null => {
+  if (indexes.length === 0 || lookups.length === 0) {
+    return null;
+  }
+
+  const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
+  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
+
+  for (const index of ranked) {
+    const fields = index.fields.map(String);
+
+    if (fields.every((field) => lookupByField.has(field))) {
+      return {
+        index,
+        values: fields.map((field) => lookupByField.get(field))
+      };
+    }
+  }
+
+  return null;
+};
+
+/** Forward index APIs through storage wrappers (validation/encryption). */
+export const withIndexForwarding = <TAdapter extends StorageAdapter>(
+  wrapper: TAdapter,
+  inner: StorageAdapter
+): TAdapter & IndexableStorageAdapter => {
+  const indexable = inner as IndexableStorageAdapter;
+
+  return Object.assign(wrapper, {
+    ...(typeof indexable.createIndex === "function"
+      ? { createIndex: indexable.createIndex.bind(indexable) }
+      : {}),
+    ...(typeof indexable.dropIndex === "function"
+      ? { dropIndex: indexable.dropIndex.bind(indexable) }
+      : {}),
+    ...(typeof indexable.listIndexes === "function"
+      ? { listIndexes: indexable.listIndexes.bind(indexable) }
+      : {})
+  }) as TAdapter & IndexableStorageAdapter;
+};
 
 const sortRecords = <TRecord extends EntityRecord>(
   records: TRecord[],

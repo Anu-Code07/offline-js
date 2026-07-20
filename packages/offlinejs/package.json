@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@offlinejs/auth": "workspace:*",
+    "@offlinejs/benchmarks": "workspace:*",
     "@offlinejs/conflicts": "workspace:*",
     "@offlinejs/coordination": "workspace:*",
     "@offlinejs/core": "workspace:*",
@@ -52,5 +53,9 @@
     "tsup": "latest",
     "typescript": "latest",
     "vitest": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

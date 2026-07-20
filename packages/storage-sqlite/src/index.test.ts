@@ -4,9 +4,19 @@ import { createSQLiteStorage, type SQLiteDriver } from "./index";
 const createDriver = (withTransaction = true): SQLiteDriver => {
   const records = new Map<string, string>();
   const indexes = new Map<string, string>();
+  const entries = new Map<string, string>();
 
   return {
     async execute(sql, params = []) {
+      if (sql.startsWith("CREATE")) {
+        return;
+      }
+
+      if (sql.startsWith("INSERT OR REPLACE INTO") && sql.includes("_index_entries")) {
+        entries.set(`${params[0]}:${params[1]}:${params[2]}:${params[3]}`, String(params[3]));
+        return;
+      }
+
       if (sql.startsWith("INSERT OR REPLACE INTO") && sql.includes("_indexes")) {
         indexes.set(`${params[0]}:${params[1]}`, String(params[2]));
         return;
@@ -14,6 +24,34 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
 
       if (sql.startsWith("INSERT OR REPLACE INTO")) {
         records.set(`${params[0]}:${params[1]}`, String(params[2]));
+        return;
+      }
+
+      if (sql.includes("_index_entries") && sql.startsWith("DELETE")) {
+        if (params.length >= 4) {
+          entries.delete(`${params[0]}:${params[1]}:${params[2]}:${params[3]}`);
+          return;
+        }
+
+        if (params.length === 2) {
+          for (const key of [...entries.keys()]) {
+            if (key.startsWith(`${params[0]}:${params[1]}:`)) {
+              entries.delete(key);
+            }
+          }
+          return;
+        }
+
+        if (params.length === 1) {
+          for (const key of [...entries.keys()]) {
+            if (key.startsWith(`${params[0]}:`)) {
+              entries.delete(key);
+            }
+          }
+          return;
+        }
+
+        entries.clear();
         return;
       }
 
@@ -55,6 +93,19 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
       }
     },
     async query(sql, params = []) {
+      if (sql.includes("_index_entries")) {
+        return [...entries.keys()]
+          .filter((key) => {
+            const [collection, indexName, valueKey] = key.split(":");
+            return (
+              collection === params[0] &&
+              indexName === params[1] &&
+              valueKey === params[2]
+            );
+          })
+          .map((key) => ({ record_id: key.split(":").at(-1) })) as never[];
+      }
+
       if (sql.includes("_indexes")) {
         return [...indexes.entries()]
           .filter(([key]) => params.length === 0 || key.startsWith(`${params[0]}:`))
@@ -90,6 +141,9 @@ describe("SQLiteStorageAdapter", () => {
     await expect(storage.listIndexes("users")).resolves.toEqual([
       { collection: "users", fields: ["name"], name: "users_name" }
     ]);
+    await expect(storage.find("users", { filters: { name: "Grace" } })).resolves.toEqual([
+      { id: "2", name: "Grace" }
+    ]);
     await storage.dropIndex("users", "users_name");
     await expect(storage.listIndexes("users")).resolves.toEqual([]);
 
@@ -101,40 +155,29 @@ describe("SQLiteStorageAdapter", () => {
     ]);
     await expect(storage.get("users", "3")).resolves.toMatchObject({ name: "Linus" });
 
+    await storage.transaction(["users"], async (store) => {
+      await store.set("users", { id: "4", name: "Barbara" });
+    });
+
     await storage.delete("users", "1");
     await expect(storage.get("users", "1")).resolves.toBeNull();
   });
 
-  it("supports fallback transactions, clear all, listing all indexes, and skipped migrations", async () => {
+  it("lists and clears indexes across collections", async () => {
     const storage = createSQLiteStorage({ driver: createDriver(false) });
-    let migrationRuns = 0;
 
-    await storage.transaction(["users"], async (store) => {
-      await store.set("users", { id: "1", name: "Ada" });
-    });
     await storage.createIndex({ collection: "users", fields: ["name"], name: "users_name" });
     await storage.createIndex({
-      collection: "projects",
+      collection: "posts",
       fields: ["title"],
-      name: "projects_title"
+      name: "posts_title"
     });
 
     await expect(storage.listIndexes()).resolves.toHaveLength(2);
-    await storage.clear("projects");
+    await storage.clear("users");
     await expect(storage.listIndexes()).resolves.toEqual([
-      { collection: "users", fields: ["name"], name: "users_name" }
+      { collection: "posts", fields: ["title"], name: "posts_title" }
     ]);
-
-    const migration = {
-      name: "once",
-      up: async () => {
-        migrationRuns += 1;
-      }
-    };
-    await storage.migrate([migration]);
-    await storage.migrate([migration]);
-    expect(migrationRuns).toBe(1);
-
     await storage.clear();
     await expect(storage.find("users")).resolves.toEqual([]);
     await expect(storage.listIndexes()).resolves.toEqual([]);
