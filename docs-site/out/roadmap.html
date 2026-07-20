@@ -138,10 +138,17 @@ export function App({ db, todos }) {
       &lt;TodoList todos={todos} /&gt;
     &lt;/OfflineProvider&gt;
   );
-}</code></pre><h3>Devtools timeline</h3><pre><code>import { createDevtoolsController } from &quot;@offlinejs/devtools-ui&quot;;
+}</code></pre><h3>DevTools (Redux-style)</h3><pre><code>import { createDevtoolsController, openOfflineDevtools, devtools } from &quot;@offlinejs/client&quot;;
 
-const devtools = createDevtoolsController(db);
-devtools.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><h3>Worker-based sync</h3><pre><code>import { createWorkerSyncPlugin } from &quot;@offlinejs/worker-sync&quot;;
+// Floating dock (Ctrl/⌘ + Shift + O)
+openOfflineDevtools(db, { position: &quot;bottom&quot; });
+
+// Or auto-open via plugin:
+createOfflineDB({ plugins: [devtools({ ui: true })] });
+
+// Inline embed:
+const panel = createDevtoolsController(db);
+panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><h3>Worker-based sync</h3><pre><code>import { createWorkerSyncPlugin } from &quot;@offlinejs/worker-sync&quot;;
 
 const worker = new Worker(new URL(&quot;./offline-sync.worker.ts&quot;, import.meta.url), {
   type: &quot;module&quot;

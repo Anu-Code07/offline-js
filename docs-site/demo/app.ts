@@ -22,7 +22,7 @@ const network = new BrowserNetworkMonitor({ initialOnline: true });
 let storage: StorageAdapter = createIndexedDBStorage({ databaseName: DB_NAME });
 let conflictStrategy: ConflictStrategy = ConflictStrategyName.LastWriteWins;
 let db: DemoDb = createDemoDb();
-let panel = createDevtoolsController(db);
+let panel = createDevtoolsController(db, { storage });
 let unsubscribe: (() => void) | undefined;
 let eventDisposers: Array<() => void> = [];
 
@@ -248,7 +248,7 @@ async function recreateDb(message: string, clearLocal = false): Promise<void> {
 
   storage = createIndexedDBStorage({ databaseName: DB_NAME });
   db = createDemoDb();
-  panel = createDevtoolsController(db);
+  panel = createDevtoolsController(db, { storage });
   panel.mount(els.devtools);
   wireEvents();
   await bindCollection();
