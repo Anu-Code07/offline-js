@@ -44,19 +44,20 @@ Video compression is reserved for later; video files still queue and upload in c
 const media = createMediaQueue({
   endpoint: &quot;/api/uploads&quot;,
   databaseName: &quot;my-app-media&quot;,
-  chunkSize: 256 * 1024,
+  chunkSize: &quot;auto&quot;,       // 256 KiB → 1 MiB → 4 MiB by file size
+  concurrency: 3,          // upload multiple jobs in parallel
+  persistIntervalMs: 500,  // coalesce IDB progress writes
   compress: {
     images: { maxWidth: 1600, maxHeight: 1600, quality: 0.82, mimeType: &quot;image/jpeg&quot; }
   },
   getHeaders: () =&gt; ({ Authorization: `Bearer ${token}` }),
-  autoFlush: true // flush when online
+  autoFlush: true
 });
 
 media.on(&quot;progress&quot;, ({ id, pct }) =&gt; console.log(id, pct));
 media.on(&quot;complete&quot;, ({ id, url }) =&gt; console.log(&quot;done&quot;, id, url));
 media.on(&quot;error&quot;, ({ id, error }) =&gt; console.warn(id, error));
 
-// Instant enqueue (compress + persist), upload runs in background when online
 const input = document.querySelector&lt;HTMLInputElement&gt;(&quot;#file&quot;)!;
 input.addEventListener(&quot;change&quot;, async () =&gt; {
   const file = input.files?.[0];
@@ -65,17 +66,17 @@ input.addEventListener(&quot;change&quot;, async () =&gt; {
   showPreview(job.previewUrl);
 });
 
-await media.flush(); // optional manual flush</code></pre><h2>How upload works</h2><p>1. <code>enqueue(file)</code> optionally compresses images → stores <strong>job + blob</strong> in IndexedDB  
+await media.flush();</code></pre><h2>Performance</h2><p>Built for real camera / field uploads:</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Lever</th><th>Default</th><th>Effect</th></tr></thead><tbody><tr><td><code>chunkSize: &quot;auto&quot;</code></td><td>256 KiB / 1 MiB / 4 MiB</td><td>Fewer round-trips on large files</td></tr><tr><td><code>concurrency</code></td><td><code>3</code></td><td>Parallel jobs (chunks inside a job stay sequential for resume)</td></tr><tr><td><code>persistIntervalMs</code> / <code>persistEveryBytes</code></td><td><code>500</code> / <code>2 MiB</code></td><td>Progress events every chunk; IDB writes coalesced</td></tr><tr><td>In-memory job + blob cache</td><td>on</td><td>No <code>getAll()</code> on every progress tick</td></tr><tr><td>Auth header cache</td><td>per attempt</td><td><code>getHeaders()</code> once per job upload, not per chunk</td></tr><tr><td>Image compress</td><td>OffscreenCanvas + skip-if-small</td><td>Avoids main-thread canvas when possible; skips re-encode when already within bounds</td></tr><tr><td>Single IDB txn enqueue</td><td>on</td><td>Job + blob written together</td></tr><tr><td>Coalesced <code>change</code> events</td><td>microtask</td><td>UI listeners aren’t flooded</td></tr></tbody></table></div><p>Tune for flaky networks: lower <code>chunkSize</code>, set <code>persistEveryBytes</code> smaller (e.g. <code>256 * 1024</code>) so resume loses less on kill.</p><h2>How upload works</h2><p>1. <code>enqueue(file)</code> optionally compresses images → stores <strong>job + blob</strong> in IndexedDB  
 2. <code>flush()</code> (or auto on <code>online</code>) uploads <strong>chunks</strong> with:
    - <code>Content-Range: bytes start-end/total</code>
    - <code>X-Upload-Id</code>, <code>X-File-Name</code>, <code>X-Chunk-Start</code>, <code>X-Chunk-End</code>, <code>X-Total-Size</code>
-3. After each successful chunk, <code>bytesUploaded</code> is saved → <strong>resume-safe</strong>  
+3. Progress is durable on a coalesced schedule; <strong>always</strong> flushed on complete / error / pause  
 4. On the final chunk, server should return JSON <code>{ &quot;url&quot;: &quot;https://...&quot; }</code> (or a raw URL string)</p><h2>Server expectations (MVP)</h2><p>Your <code>PUT endpoint</code> should:</p><ul><li>Accept chunk bodies  </li>
 <li>Key uploads by <code>X-Upload-Id</code>  </li>
 <li>Append/store bytes for the range  </li>
 <li>On the last chunk (<code>X-Chunk-End === X-Total-Size</code>), finalize and respond with <code>{ url }</code></li>
 </ul>
-<h2>API</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Method</th><th>Purpose</th></tr></thead><tbody><tr><td><code>enqueue(file)</code></td><td>Compress (images), persist, return <code>MediaJob</code></td></tr><tr><td><code>flush()</code></td><td>Upload pending jobs</td></tr><tr><td><code>list()</code></td><td>All jobs</td></tr><tr><td><code>pause(id)</code> / <code>resume(id?)</code></td><td>Pause one job or resume + flush</td></tr><tr><td><code>remove(id)</code></td><td>Delete job + blob</td></tr><tr><td><code>on(event, fn)</code></td><td><code>enqueue</code> \</td><td><code>progress</code> \</td><td><code>complete</code> \</td><td><code>error</code> \</td><td><code>change</code></td></tr></tbody></table></div><h2>With OfflineJS data layer</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Concern</th><th>Use</th></tr></thead><tbody><tr><td>JSON records / checklists / stock</td><td><code>createOfflineDB</code></td></tr><tr><td>Photo / file uploads</td><td><code>createMediaQueue</code></td></tr><tr><td>TTL GET caching</td><td><code>cachedJson</code></td></tr></tbody></table></div><p>Typical inspection app: OfflineDB for the form fields, media-queue for site photos.
+<h2>API</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Method</th><th>Purpose</th></tr></thead><tbody><tr><td><code>enqueue(file)</code></td><td>Compress (images), persist, return <code>MediaJob</code></td></tr><tr><td><code>flush()</code></td><td>Upload pending jobs (parallel up to <code>concurrency</code>)</td></tr><tr><td><code>list()</code></td><td>All jobs (from memory cache)</td></tr><tr><td><code>pause(id)</code> / <code>resume(id?)</code></td><td>Pause one job or resume + flush</td></tr><tr><td><code>remove(id)</code></td><td>Delete job + blob</td></tr><tr><td><code>on(event, fn)</code></td><td><code>enqueue</code> \</td><td><code>progress</code> \</td><td><code>complete</code> \</td><td><code>error</code> \</td><td><code>change</code></td></tr></tbody></table></div><h2>With OfflineJS data layer</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Concern</th><th>Use</th></tr></thead><tbody><tr><td>JSON records / checklists / stock</td><td><code>createOfflineDB</code></td></tr><tr><td>Photo / file uploads</td><td><code>createMediaQueue</code></td></tr><tr><td>TTL GET caching</td><td><code>cachedJson</code></td></tr></tbody></table></div><p>Typical inspection app: OfflineDB for the form fields, media-queue for site photos.
 </p>
       </article>
     </div>
