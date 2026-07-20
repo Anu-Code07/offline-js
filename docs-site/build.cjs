@@ -22,6 +22,7 @@ const pages = [
   ["sync", "docs/sync-engine.md", "Sync", "docs"],
   ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["ai", "docs/ai.md", "AI.md", "docs"],
+  ["cache", "docs/cache.md", "Cache", "docs"],
   ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["performance", "docs/performance.md", "Performance", "docs"],
   ["practices", "docs/best-practices.md", "Best practices", "docs"],

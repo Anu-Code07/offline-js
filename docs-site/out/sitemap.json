@@ -45,6 +45,11 @@
     "url": "/ai.html"
   },
   {
+    "slug": "cache",
+    "title": "Cache",
+    "url": "/cache.html"
+  },
+  {
     "slug": "benchmarks",
     "title": "Benchmarks",
     "url": "/benchmarks.html"

@@ -163,6 +163,26 @@ export {
   generateAesGcmKey
 } from "@offlinejs/encryption";
 
+// HTTP cache (read-through TTL — not the offline mutation queue)
+export {
+  buildCacheKey,
+  cachedFetch,
+  cachedJson,
+  clearHttpCache,
+  createCacheApiStore,
+  createIndexedDBHttpCache,
+  createMemoryHttpCache,
+  invalidateCacheKey
+} from "@offlinejs/cache";
+export type {
+  CacheEntry,
+  CachePolicy,
+  CachedFetchOptions,
+  CachedResult,
+  HttpCacheStore,
+  IndexedDBHttpCacheOptions
+} from "@offlinejs/cache";
+
 // Plugins & advanced
 export {
   backgroundSyncPlugin,

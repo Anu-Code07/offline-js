@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="OfflineJS — write locally, sync automatically, recover gracefully. The TypeScript offline-first data layer with a durable outbox and conflict strategies you choose."
+    />
+    <title>Cache · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
+    
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="cache.html" aria-current="page">Cache</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>HTTP cache (<code>@offlinejs/cache</code>)</h1><p>General-purpose <strong>read-through</strong> cache for GET/JSON (and optional Cache API for assets).</p><p>This is <strong>not</strong> the offline mutation queue. Use <code>createOfflineDB</code> when users must write offline and sync later. Use this package when you want faster / offline-*readable* HTTP responses with TTL.</p><h2>Install</h2><p>Already included with <code>@offlinejs/client</code>, or:</p><pre><code>pnpm add @offlinejs/cache</code></pre><h2>Quick start</h2><pre><code>import { cachedJson, createIndexedDBHttpCache } from &quot;@offlinejs/client&quot;;
+
+const store = createIndexedDBHttpCache({ databaseName: &quot;my-http-cache&quot; });
+
+const result = await cachedJson&lt;{ items: string[] }&gt;(&quot;/api/items&quot;, undefined, {
+  store,
+  ttlMs: 60_000, // fresh for 1 minute
+  staleWhileRevalidateMs: 120_000 // serve stale up to 2 more minutes while refreshing
+});
+
+console.log(result.data, result.fromCache, result.stale);</code></pre><h2>Stores</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Helper</th><th>Persistence</th><th>Best for</th></tr></thead><tbody><tr><td><code>createMemoryHttpCache()</code></td><td>Tab memory</td><td>Tests, short-lived UI</td></tr><tr><td><code>createIndexedDBHttpCache()</code></td><td>IndexedDB</td><td>Durable API response cache</td></tr><tr><td><code>createCacheApiStore()</code></td><td>Cache API</td><td>Raw <code>Response</code> / asset caching in SW-friendly apps</td></tr></tbody></table></div><h2>Invalidate</h2><pre><code>import { clearHttpCache, invalidateCacheKey } from &quot;@offlinejs/client&quot;;
+
+await invalidateCacheKey(&quot;GET /api/items&quot;, store);
+await clearHttpCache(store);</code></pre><h2>With OfflineJS together</h2><p>Typical pattern:</p><p>1. <strong>Cache</strong> catalog / reference GETs with <code>cachedJson</code> (TTL)  
+2. <strong>OfflineDB</strong> for user-owned records that are created/updated offline and synced  </p><p>Do not put mutable outbox writes only in the HTTP cache — they need <code>createOfflineDB</code>.
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner footer-inner">
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <strong>OfflineJS</strong>
+          </div>
+          <p class="footer-copy">
+            Write locally. Sync when the network returns. Choose how conflicts resolve —
+            with a sync pipeline you can see.
+          </p>
+          <div class="footer-links">
+            <a href="demo.html">Live demo</a>
+            <a href="quick-start.html">Quick start</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
+            <a href="benchmarks.html">Benchmarks</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js?v=296300df19"></script>
+    
+  </body>
+</html>

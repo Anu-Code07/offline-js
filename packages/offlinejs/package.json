@@ -20,6 +20,7 @@
   "dependencies": {
     "@offlinejs/auth": "workspace:*",
     "@offlinejs/benchmarks": "workspace:*",
+    "@offlinejs/cache": "workspace:*",
     "@offlinejs/conflicts": "workspace:*",
     "@offlinejs/core": "workspace:*",
     "@offlinejs/devtools": "workspace:*",
