@@ -148,7 +148,7 @@ const media = createMediaQueue({
 
 media.on(&quot;progress&quot;, ({ id, pct }) =&gt; {});
 media.on(&quot;complete&quot;, ({ id, url }) =&gt; {});
-await media.enqueue(file);</code></pre><p>See <a href="media-queue.html">Media queue</a> for server headers, resume, and API.</p><h2>Next steps</h2><ul><li><a href="demo.html">Live demo</a> — device → outbox → remote with DevTools</li>
+await media.enqueue(file);</code></pre><p>See <a href="media-queue.html">Media queue</a> for server headers, resume, API, and the <strong>shipped vs hard-parts</strong> status (video compress, tus/S3, iOS background, quotas).</p><h2>Next steps</h2><ul><li><a href="demo.html">Live demo</a> — device → outbox → remote with DevTools</li>
 <li><a href="plugins.html">Plugins</a> — deeper plugin APIs</li>
 <li><a href="media-queue.html">Media queue</a> — offline photo uploads that resume</li>
 <li><a href="cache.html">HTTP cache</a> — TTL GET/JSON caching (<code>cachedJson</code>)</li>

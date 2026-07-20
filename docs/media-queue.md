@@ -9,7 +9,17 @@ Durable **offline media uploads** for the web — think OfflineJS, but for blobs
 - **Chunked resume** from `bytesUploaded`  
 - Progress / complete / error events  
 
-Video compression is reserved for later; video files still queue and upload in chunks.
+## What’s shipped vs hard parts
+
+| Hard part | Status | Notes |
+| --- | --- | --- |
+| Image compress + durable queue + resume | **Shipped** | IndexedDB jobs/blobs, chunked `PUT`, progress events, parallel jobs |
+| Chunked / resumable protocol | **Partial** | Custom `Content-Range` + `X-Upload-*` headers — **not** tus, **not** S3 multipart yet |
+| Video compression in the browser | **Not yet** | Videos still enqueue and upload as-is (no transcode) |
+| iOS Safari background uploads | **Not yet** | Foreground tab / next-open resume only — no Background Fetch / SW bridge |
+| Storage quotas for huge files | **Not yet** | No quota probe, eviction, or OPFS spillover — large videos can hit browser limits |
+
+Use this today for **photos / proof-of-delivery / inspection images**. Treat video + true background iOS + tus/S3 as upcoming.
 
 ## Install
 

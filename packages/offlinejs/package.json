@@ -1,6 +1,6 @@
 {
   "name": "@offlinejs/client",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "One-import OfflineJS client SDK. Use specialized @offlinejs/* packages only when you need them.",
   "type": "module",
   "sideEffects": false,

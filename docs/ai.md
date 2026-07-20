@@ -217,6 +217,8 @@ await media.enqueue(file);
 
 Do not hand-roll blob upload queues. Docs: https://offline-js-next2.vercel.app/media-queue
 
+**Not shipped yet:** browser video compression, tus / S3 multipart adapters, iOS Safari background upload, storage-quota / OPFS spillover. Images + custom chunked resume are the supported path.
+
 ---
 
 ## Hard rules for AI agents

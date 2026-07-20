@@ -147,7 +147,7 @@ const media = createMediaQueue({
   compress: { images: { maxWidth: 1600 } }
 });
 media.on(&quot;complete&quot;, ({ id, url }) =&gt; {});
-await media.enqueue(file);</code></pre><p>Do not hand-roll blob upload queues. Docs: https://offline-js-next2.vercel.app/media-queue</p><hr /></p><h2>Hard rules for AI agents</h2><p>1. <strong>Install</strong> <code>@offlinejs/client</code> unless the user asks for a focused <code>@offlinejs/*</code> package.  
+await media.enqueue(file);</code></pre><p>Do not hand-roll blob upload queues. Docs: https://offline-js-next2.vercel.app/media-queue</p><p><strong>Not shipped yet:</strong> browser video compression, tus / S3 multipart adapters, iOS Safari background upload, storage-quota / OPFS spillover. Images + custom chunked resume are the supported path.</p><hr /></p><h2>Hard rules for AI agents</h2><p>1. <strong>Install</strong> <code>@offlinejs/client</code> unless the user asks for a focused <code>@offlinejs/*</code> package.  
 2. <strong>Local writes first</strong> — <code>collection.create/update/delete</code> must not await the network.  
 3. <strong>Outbox is sacred</strong> — do not replace with <code>localStorage</code> mutation lists.  
 4. <strong>Conflicts</strong> — use <code>ConflictStrategyName.*</code>; don’t invent silent merges.  
