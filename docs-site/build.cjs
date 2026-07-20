@@ -345,8 +345,8 @@ function renderDemo() {
     title: "Live demo",
     current: "demo",
     body,
-    head: '<link rel="stylesheet" href="assets/demo.css?v=stock-1" />',
-    scripts: '<script type="module" src="assets/demo.js?v=stock-1"></script>'
+    head: '<link rel="stylesheet" href="assets/demo-stock.css" />',
+    scripts: '<script type="module" src="assets/demo-stock.js"></script>'
   });
 }
 

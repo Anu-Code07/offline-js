@@ -1971,6 +1971,11 @@ function createDemoDb() {
   });
 }
 async function boot() {
+  if (document.readyState === "loading") {
+    await new Promise((resolve) => {
+      document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+  }
   els = bindElements();
   panel.mount(els.devtools);
   wireControls();
@@ -2273,12 +2278,23 @@ function labelForState(state) {
   }
 }
 function setStatus(message) {
-  els.status.textContent = message;
+  const status = els?.status ?? document.querySelector("#demo-status");
+  if (status) {
+    status.textContent = message;
+  }
 }
 function escapeHtml2(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 void boot().catch((error) => {
   console.error(error);
-  setStatus(error instanceof Error ? error.message : "Demo failed to start");
+  const message = error instanceof Error ? error.message : "Demo failed to start";
+  try {
+    setStatus(message);
+  } catch {
+    const fallback = document.querySelector("#demo-status");
+    if (fallback) {
+      fallback.textContent = message;
+    }
+  }
 });

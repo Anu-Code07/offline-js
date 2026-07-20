@@ -97,6 +97,12 @@ function createDemoDb(): DemoDb {
 }
 
 async function boot(): Promise<void> {
+  if (document.readyState === "loading") {
+    await new Promise<void>((resolve) => {
+      document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+  }
+
   els = bindElements();
   panel.mount(els.devtools);
   wireControls();
@@ -482,7 +488,10 @@ function labelForState(state: string): string {
 }
 
 function setStatus(message: string): void {
-  els.status.textContent = message;
+  const status = els?.status ?? document.querySelector<HTMLElement>("#demo-status");
+  if (status) {
+    status.textContent = message;
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -495,5 +504,13 @@ function escapeHtml(value: string): string {
 
 void boot().catch((error) => {
   console.error(error);
-  setStatus(error instanceof Error ? error.message : "Demo failed to start");
+  const message = error instanceof Error ? error.message : "Demo failed to start";
+  try {
+    setStatus(message);
+  } catch {
+    const fallback = document.querySelector<HTMLElement>("#demo-status");
+    if (fallback) {
+      fallback.textContent = message;
+    }
+  }
 });
