@@ -84,7 +84,6 @@ a:hover {
 
 .topbar-inner,
 .page,
-.hero-inner,
 .section-inner {
   width: min(var(--max), calc(100% - 2rem));
   margin-inline: auto;
@@ -227,8 +226,8 @@ body.nav-open .nav-toggle-bars::after {
 .hero {
   position: relative;
   min-height: min(94vh, 860px);
-  display: grid;
-  align-items: end;
+  display: flex;
+  align-items: center;
   overflow: hidden;
   border-bottom: 1px solid var(--line);
 }
@@ -236,6 +235,7 @@ body.nav-open .nav-toggle-bars::after {
 .hero-visual {
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background:
     linear-gradient(180deg, transparent 40%, rgba(248, 252, 251, 0.55) 78%, var(--paper) 100%),
     radial-gradient(ellipse 70% 55% at 72% 38%, rgba(15, 174, 154, 0.32), transparent 62%),
@@ -269,16 +269,32 @@ body.nav-open .nav-toggle-bars::after {
   animation-duration: 18s;
 }
 
-.hero-pipeline {
-  position: absolute;
-  right: max(4%, calc(50% - min(var(--max), 100%) / 2 + 2rem));
-  top: 18%;
-  display: flex;
+.hero-layout {
+  position: relative;
+  z-index: 1;
+  width: min(var(--max), calc(100% - 2rem));
+  margin-inline: auto;
+  display: grid;
+  gap: 2rem;
+  padding: 5.5rem 0 3.5rem;
   align-items: center;
-  gap: 0;
-  width: min(52vw, 520px);
-  max-width: calc(100% - 2rem);
-  transform: rotate(-2deg);
+}
+
+.hero-inner {
+  position: relative;
+  max-width: 34rem;
+  margin: 0;
+  padding: 0;
+  width: auto;
+}
+
+.hero-pipeline {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  max-width: 34rem;
+  transform: rotate(-1.5deg);
   animation: pipeline-float 8s ease-in-out infinite;
 }
 
@@ -287,9 +303,10 @@ body.nav-open .nav-toggle-bars::after {
   min-width: 0;
   padding: 1rem 0.85rem;
   text-align: center;
-  border: 1px solid rgba(16, 42, 46, 0.14);
-  background: rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(16, 42, 46, 0.16);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px rgba(16, 42, 46, 0.08);
 }
 
 .hero-pipe-stage[data-stage="device"] {
@@ -327,11 +344,12 @@ body.nav-open .nav-toggle-bars::after {
 
 .hero-pipe-link {
   position: relative;
-  width: 1.75rem;
-  height: 2px;
+  width: 1.5rem;
   flex-shrink: 0;
+  align-self: center;
+  height: 2px;
   background: linear-gradient(90deg, var(--signal), var(--spark));
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .hero-pipe-pulse {
@@ -347,20 +365,11 @@ body.nav-open .nav-toggle-bars::after {
   animation: pipe-pulse 2.4s ease-in-out infinite;
 }
 
-.hero-pipe-link:nth-of-type(2) .hero-pipe-pulse {
+.hero-pipe-link:last-of-type .hero-pipe-pulse,
+.hero-pipeline .hero-pipe-link:nth-child(4) .hero-pipe-pulse {
   background: var(--spark);
   box-shadow: 0 0 0 4px rgba(244, 162, 97, 0.22);
   animation-delay: 1.2s;
-}
-
-.hero-inner {
-  position: relative;
-  padding: 7.5rem 0 4.75rem;
-  max-width: min(36rem, 100%);
-  margin-left: auto;
-  margin-right: auto;
-  margin-inline: auto;
-  width: min(var(--max), calc(100% - 2rem));
 }
 
 .brand-hero {
@@ -886,10 +895,10 @@ body.nav-open .nav-toggle-bars::after {
 @keyframes pipeline-float {
   0%,
   100% {
-    transform: rotate(-2deg) translateY(var(--parallax-y, 0px));
+    transform: rotate(-1.5deg) translateY(0);
   }
   50% {
-    transform: rotate(-1.5deg) translateY(calc(var(--parallax-y, 0px) - 10px));
+    transform: rotate(-1deg) translateY(-8px);
   }
 }
 
@@ -926,10 +935,9 @@ body.nav-open .nav-toggle-bars::after {
 
 @media (max-width: 980px) {
   .hero-pipeline {
-    right: 4%;
-    top: 12%;
-    width: min(58vw, 420px);
-    opacity: 0.92;
+    max-width: none;
+    transform: none;
+    animation: pipeline-float-mobile 8s ease-in-out infinite;
   }
 }
 
@@ -977,21 +985,11 @@ body.nav-open .nav-toggle-bars::after {
 
   .hero {
     min-height: min(90vh, 760px);
-    align-items: end;
+    align-items: center;
   }
 
-  .hero-inner {
-    padding: 5.5rem 0 3.25rem;
-  }
-
-  .hero-pipeline {
-    position: absolute;
-    left: 50%;
-    right: auto;
-    top: 10%;
-    width: min(92vw, 400px);
-    transform: translateX(-50%) rotate(0deg);
-    animation: pipeline-float-mobile 8s ease-in-out infinite;
+  .hero-layout {
+    padding: 4.75rem 0 3rem;
   }
 
   .section {
@@ -1024,18 +1022,18 @@ body.nav-open .nav-toggle-bars::after {
 @keyframes pipeline-float-mobile {
   0%,
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
   50% {
-    transform: translateX(-50%) translateY(-8px);
+    transform: translateY(-6px);
   }
 }
 
 @media (max-width: 520px) {
   .topbar-inner,
-  .hero-inner,
   .section-inner,
-  .page {
+  .page,
+  .hero-layout {
     width: min(var(--max), calc(100% - 1.25rem));
   }
 
@@ -1051,16 +1049,16 @@ body.nav-open .nav-toggle-bars::after {
     margin-bottom: 1.4rem;
   }
 
-  .hero-pipeline {
-    top: 8%;
-  }
-
   .hero-pipe-stage {
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem 0.45rem;
   }
 
   .hero-pipe-detail {
     font-size: 0.62rem;
+  }
+
+  .hero-pipe-link {
+    width: 0.85rem;
   }
 
   .button {
@@ -1077,22 +1075,18 @@ body.nav-open .nav-toggle-bars::after {
   }
 }
 
-/* Large screens: text left, pipeline right as composition */
+/* Large screens: copy left, pipeline right */
 @media (min-width: 980px) {
-  .hero {
-    align-items: center;
-  }
-
-  .hero-inner {
-    margin-left: max(0px, calc((100% - min(var(--max), 100% - 2rem)) / 2));
-    margin-right: auto;
+  .hero-layout {
+    grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+    gap: 2.5rem;
     padding: 6rem 0 5rem;
-    width: min(34rem, 46%);
   }
 
   .hero-pipeline {
-    top: 50%;
-    transform: translateY(-50%) rotate(-2deg);
+    max-width: none;
+    justify-self: stretch;
+    transform: rotate(-2deg);
     animation: pipeline-float-lg 8s ease-in-out infinite;
   }
 }
@@ -1100,9 +1094,9 @@ body.nav-open .nav-toggle-bars::after {
 @keyframes pipeline-float-lg {
   0%,
   100% {
-    transform: translateY(calc(-50% + var(--parallax-y, 0px))) rotate(-2deg);
+    transform: rotate(-2deg) translateY(0);
   }
   50% {
-    transform: translateY(calc(-50% + var(--parallax-y, 0px) - 12px)) rotate(-1.5deg);
+    transform: rotate(-1.5deg) translateY(-10px);
   }
 }
