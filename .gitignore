@@ -6,3 +6,4 @@ docs-site/dist
 .turbo
 .DS_Store
 .vercel
+.env*
