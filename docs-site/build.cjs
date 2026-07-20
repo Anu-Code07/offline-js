@@ -50,16 +50,15 @@ function main() {
 Install OfflineJS and start writing local-first data in minutes.
 
 \`\`\`bash
-pnpm add @offlinejs/core @offlinejs/storage-indexeddb
+pnpm add @offlinejs
 \`\`\`
 
 \`\`\`ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage({ databaseName: "my-app" }),
+  storage: "indexeddb",
   sync: { conflictStrategy: "lastWriteWins" }
 });
 
@@ -67,6 +66,8 @@ const todos = db.collection("todos");
 await todos.create({ title: "Ship offline sync", completed: false });
 const open = await todos.find({ filters: { completed: false } });
 \`\`\`
+
+One package covers the common path. Need something specific? Import it from \`@offlinejs\` too, or from a focused package like \`@offlinejs/storage-sqlite\`.
 
 ## What happens next
 
@@ -211,11 +212,13 @@ function renderHome() {
         <p class="section-kicker reveal">Install</p>
         <h2 class="section-title reveal">Ship the first offline collection today.</h2>
         <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
-        <pre class="code-panel reveal"><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb
+        <pre class="code-panel reveal"><code>pnpm add @offlinejs
+
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage()
+  storage: "indexeddb"
 });
 
 await db.collection("todos").create({ title: "Works offline" });</code></pre>

@@ -5,12 +5,11 @@ Offline-first data layer for TypeScript and JavaScript.
 Write to local storage immediately. Sync when the network is back. Retry failed mutations automatically. Resolve conflicts with a strategy you choose.
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage({ databaseName: "my-app" }),
+  storage: "indexeddb",
   sync: { conflictStrategy: "lastWriteWins" }
 });
 
@@ -22,22 +21,16 @@ const open = await todos.find({ filters: { completed: false } });
 
 ## Install
 
-Browser apps:
+One package for the common path:
 
 ```bash
-pnpm add @offlinejs/core @offlinejs/storage-indexeddb
+pnpm add @offlinejs
 ```
 
-Node, tests, or SSR (no persistence needed):
+Need something specialized later? Keep using `@offlinejs`, or import only that package for a smaller bundle:
 
 ```bash
-pnpm add @offlinejs/core @offlinejs/storage-memory
-```
-
-React:
-
-```bash
-pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/react
+pnpm add @offlinejs/storage-sqlite
 ```
 
 ## Quick start
@@ -64,18 +57,19 @@ type AppData = {
 ### 2. Create the database
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB<AppData>({
   baseURL: "https://api.example.com",
-  storage: createIndexedDBStorage({ databaseName: "my-app" }),
+  storage: "indexeddb", // or "memory" | "opfs" | a custom adapter
   sync: {
     autoStart: true,
     conflictStrategy: "lastWriteWins"
   }
 });
 ```
+
+If you omit `storage`, OfflineJS uses IndexedDB in the browser and memory in Node.
 
 ### 3. Read and write through collections
 
@@ -190,7 +184,7 @@ Built-in options: `clientWins`, `serverWins`, `lastWriteWins`, `merge`, or a cus
 
 ```ts
 const db = createOfflineDB({
-  storage: createIndexedDBStorage(),
+  storage: "indexeddb",
   sync: {
     conflictStrategy: async ({ client, server }) => ({
       ...server,
@@ -204,11 +198,10 @@ const db = createOfflineDB({
 ### Use memory storage in tests or Node
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createMemoryStorage } from "@offlinejs/storage-memory";
+import { createOfflineDB } from "@offlinejs";
 
 const db = createOfflineDB({
-  storage: createMemoryStorage(),
+  storage: "memory",
   sync: { enabled: false }
 });
 
@@ -221,7 +214,7 @@ Runnable example: [`examples/basic-node`](./examples/basic-node).
 ### Use React hooks
 
 ```tsx
-import { useOfflineCollection } from "@offlinejs/react";
+import { useOfflineCollection } from "@offlinejs";
 
 function TodoList({ todos }) {
   const { records, create, update, delete: remove } = useOfflineCollection(todos);
@@ -264,9 +257,7 @@ Common plugin use cases: auth headers, logging, validation, encryption, analytic
 Use this when your backend does not match the default fetch paths.
 
 ```ts
-import type { SyncTransport } from "@offlinejs/core";
-import { createOfflineDB } from "@offlinejs/core";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createOfflineDB, type SyncTransport } from "@offlinejs";
 
 const transport: SyncTransport = {
   async request(request) {
@@ -284,7 +275,7 @@ const transport: SyncTransport = {
 };
 
 const db = createOfflineDB({
-  storage: createIndexedDBStorage(),
+  storage: "indexeddb",
   transport
 });
 ```
@@ -298,7 +289,7 @@ import {
   StorageError,
   SyncError,
   ValidationError
-} from "@offlinejs/core";
+} from "@offlinejs";
 
 try {
   await todos.sync();
@@ -346,16 +337,17 @@ db.use(plugin);
 db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:complete" | "conflict" | "error", handler);
 ```
 
-## Packages you will actually use
+## Packages
 
 | Package | When to use it |
 | --- | --- |
-| `@offlinejs/core` | Create the DB, collections, events, plugins |
-| `@offlinejs/storage-indexeddb` | Durable browser storage |
-| `@offlinejs/storage-memory` | Tests, Node, SSR, demos |
+| `@offlinejs` | **Default.** One import for createOfflineDB, presets, React, auth, plugins, and more |
+| `@offlinejs/core` | Internal core only, if you want the smallest custom composition |
+| `@offlinejs/storage-indexeddb` | Optional direct IndexedDB adapter import |
+| `@offlinejs/storage-memory` | Optional direct memory adapter import |
 | `@offlinejs/storage-sqlite` | Mobile, Electron, server SQLite |
 | `@offlinejs/storage-opfs` | Large browser datasets via OPFS |
-| `@offlinejs/react` | React hooks for collections |
+| `@offlinejs/react` | Optional direct React hooks import |
 | `@offlinejs/next` | Next.js helpers |
 | `@offlinejs/auth` | Auth-aware transport / plugin patterns |
 | `@offlinejs/validation` | Schema validation around storage |
@@ -387,17 +379,22 @@ Vercel publishes `docs-site/out` with install/build commands set to `true` (no p
 
 ## Advanced package composition
 
-Layer optional packages around `@offlinejs/core` instead of rewriting your app API:
+Still one import — pull the helpers you need from `@offlinejs`:
 
 ```ts
-import { createOfflineDB } from "@offlinejs/core";
-import { createAuthTransport } from "@offlinejs/auth";
-import { createBroadcastCoordination, coordinationPlugin } from "@offlinejs/coordination";
-import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from "@offlinejs/encryption";
-import { createFetchTransport } from "@offlinejs/network";
-import { backgroundSyncPlugin } from "@offlinejs/service-worker";
-import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
-import { createValidatedStorage, createRequiredFieldsValidator } from "@offlinejs/validation";
+import {
+  backgroundSyncPlugin,
+  coordinationPlugin,
+  createAuthTransport,
+  createBroadcastCoordination,
+  createFetchTransport,
+  createIndexedDBStorage,
+  createJsonEncryptionStorage,
+  createOfflineDB,
+  createRequiredFieldsValidator,
+  createValidatedStorage,
+  createWebCryptoAesGcmCodec
+} from "@offlinejs";
 
 const baseStorage = createIndexedDBStorage({ databaseName: "app" });
 const codec = await createWebCryptoAesGcmCodec(key);

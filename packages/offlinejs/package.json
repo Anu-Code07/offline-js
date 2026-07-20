@@ -1,0 +1,56 @@
+{
+  "name": "@offlinejs",
+  "version": "0.1.0",
+  "description": "One-import OfflineJS SDK. Use specialized @offlinejs/* packages only when you need them.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/auth": "workspace:*",
+    "@offlinejs/conflicts": "workspace:*",
+    "@offlinejs/coordination": "workspace:*",
+    "@offlinejs/core": "workspace:*",
+    "@offlinejs/devtools": "workspace:*",
+    "@offlinejs/devtools-ui": "workspace:*",
+    "@offlinejs/encryption": "workspace:*",
+    "@offlinejs/network": "workspace:*",
+    "@offlinejs/next": "workspace:*",
+    "@offlinejs/react": "workspace:*",
+    "@offlinejs/service-worker": "workspace:*",
+    "@offlinejs/storage-indexeddb": "workspace:*",
+    "@offlinejs/storage-memory": "workspace:*",
+    "@offlinejs/storage-opfs": "workspace:*",
+    "@offlinejs/storage-sqlite": "workspace:*",
+    "@offlinejs/sync-protocol": "workspace:*",
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/validation": "workspace:*",
+    "@offlinejs/worker-sync": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "react": "latest",
+    "tsup": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

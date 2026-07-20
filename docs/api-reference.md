@@ -1,15 +1,42 @@
 # API Reference
 
+## Install
+
+```bash
+pnpm add @offlinejs
+```
+
 ## `createOfflineDB(options)`
 
-Creates a framework-agnostic offline database.
+Creates a framework-agnostic offline database from the one-import package.
 
 ```ts
+import { createOfflineDB } from "@offlinejs";
+
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage,
+  storage: "indexeddb", // or "memory" | "opfs" | a custom adapter
   sync: { conflictStrategy: "lastWriteWins" }
 });
+```
+
+If `storage` is omitted, OfflineJS picks `"indexeddb"` in browsers and `"memory"` elsewhere.
+
+Need a specialized helper? Import it from the same package:
+
+```ts
+import {
+  createOfflineDB,
+  createAuthTransport,
+  createSQLiteStorage,
+  useOfflineCollection
+} from "@offlinejs";
+```
+
+Or import only that package when you want a smaller bundle:
+
+```ts
+import { createSQLiteStorage } from "@offlinejs/storage-sqlite";
 ```
 
 ## Collections

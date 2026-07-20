@@ -1,5 +1,4 @@
-import { createOfflineDB } from "@offlinejs/core";
-import { createMemoryStorage } from "@offlinejs/storage-memory";
+import { createOfflineDB } from "@offlinejs";
 
 type ExampleData = {
   users: {
@@ -12,7 +11,7 @@ type ExampleData = {
 };
 
 const db = createOfflineDB<ExampleData>({
-  storage: createMemoryStorage(),
+  storage: "memory",
   sync: { enabled: false }
 });
 
