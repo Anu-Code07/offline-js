@@ -129,8 +129,8 @@
             <p><code>@offlinejs/client</code> covers createOfflineDB, storage presets, React hooks, and common plugins.</p>
           </article>
           <article class="feature reveal">
-            <h3>Visible trust</h3>
-            <p>Live pipeline demo plus floating DevTools — open with Ctrl/⌘+Shift+O.</p>
+            <h3>Sync you can inspect</h3>
+            <p>Live device → outbox → remote demo, plus DevTools (Ctrl/⌘+Shift+O).</p>
           </article>
           <article class="feature reveal">
             <h3>Batched durable writes</h3>
@@ -141,8 +141,8 @@
             <p>Status-filtered outbox reads, concurrent push batches, and query pushdown.</p>
           </article>
           <article class="feature reveal">
-            <h3>Honest metrics</h3>
-            <p>Write throughput and find latency — documented methodology, not marketing fluff.</p>
+            <h3>Conflict strategies</h3>
+            <p>Last-write-wins, client/server wins, or merge — pick the policy your product needs.</p>
           </article>
         </div>
       </div>
@@ -176,7 +176,7 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
     
     <section class="section bench-landing" aria-label="Benchmark scores">
       <div class="section-inner">
-        <p class="section-kicker reveal">Proof</p>
+        <p class="section-kicker reveal">Performance</p>
         <h2 class="section-title reveal">Measured on real adapters.</h2>
         <p class="section-copy reveal">
           5,000-record suite against memory, IndexedDB, and SQLite.
@@ -214,16 +214,16 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
 
     <section class="section section-cta">
       <div class="section-inner">
-        <p class="section-kicker reveal">Keep going</p>
-        <h2 class="section-title reveal">Explore the system.</h2>
+        <p class="section-kicker reveal">Docs</p>
+        <h2 class="section-title reveal">Build with OfflineJS.</h2>
         <p class="section-copy reveal">
-          Architecture, adapters, sync, plugins, DevTools, contracts, and the completed v0.2–v0.8 foundations.
+          Architecture, storage adapters, sync, plugins, and best practices — everything you need to ship offline-first.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="architecture.html">Architecture</a>
+          <a class="button button-primary" href="quick-start.html">Quick start</a>
+          <a class="button button-secondary" href="api.html">API</a>
           <a class="button button-secondary" href="plugins.html">Plugins</a>
-          <a class="button button-secondary" href="ai.html">AI.md</a>
-          <a class="button button-secondary" href="roadmap.html">Roadmap</a>
+          <a class="button button-secondary" href="demo.html">Live demo</a>
         </div>
       </div>
     </section>
