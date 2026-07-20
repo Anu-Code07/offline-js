@@ -23,6 +23,7 @@ const pages = [
   ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["ai", "docs/ai.md", "AI.md", "docs"],
   ["cache", "docs/cache.md", "Cache", "docs"],
+  ["media-queue", "docs/media-queue.md", "Media queue", "docs"],
   ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["performance", "docs/performance.md", "Performance", "docs"],
   ["practices", "docs/best-practices.md", "Best practices", "docs"],
@@ -195,6 +196,7 @@ function shell({ title, current, body, head = "", scripts = "" }) {
             <a href="quick-start.html">Quick start</a>
             <a href="plugins.html">Plugins</a>
             <a href="cache.html">HTTP cache</a>
+            <a href="media-queue.html">Media queue</a>
             <a href="ai.html">AI.md</a>
             <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
           </div>
@@ -467,7 +469,7 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
         <p class="section-kicker reveal">Install</p>
         <h2 class="section-title reveal">One package on npm.</h2>
         <p class="section-copy reveal">
-          <code>pnpm add @offlinejs/client</code> — offline DB, sync, plugins, and HTTP cache helpers.
+          <code>pnpm add @offlinejs/client</code> — offline DB, sync, plugins, HTTP cache, and media uploads.
           Also: <a href="https://www.npmjs.com/package/@offlinejs/client">npmjs.com/package/@offlinejs/client</a>
         </p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
@@ -483,6 +485,7 @@ const db = createOfflineDB({
 await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
         <div class="cta-row reveal" style="margin-top: 1.5rem">
           <a class="button button-primary" href="quick-start.html">Quick start guide</a>
+          <a class="button button-secondary" href="media-queue.html">Media queue</a>
           <a class="button button-secondary" href="cache.html">HTTP cache</a>
           <a class="button button-secondary" href="api.html">API reference</a>
         </div>

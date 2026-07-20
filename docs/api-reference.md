@@ -275,10 +275,31 @@ await cachedJson("/api/catalog", {
 ```
 
 See [HTTP cache](cache.html) for the full how-to (arguments, stores, invalidation).
+
+## Media queue
+
+Durable **photo / blob uploads** (IndexedDB queue, image compress, chunked resume) via `createMediaQueue` from `@offlinejs/client` or [`@offlinejs/media-queue`](https://www.npmjs.com/package/@offlinejs/media-queue):
+
+```ts
+import { createMediaQueue } from "@offlinejs/client";
+
+const media = createMediaQueue({
+  endpoint: "/api/uploads",
+  compress: { images: { maxWidth: 1600 } }
+});
+
+media.on("progress", ({ id, pct }) => {});
+media.on("complete", ({ id, url }) => {});
+await media.enqueue(file);
+```
+
+See [Media queue](media-queue.html) for server headers, resume, and API.
+
 ## Next steps
 
 - [Live demo](demo.html) — device → outbox → remote with DevTools
 - [Plugins](plugins.html) — deeper plugin APIs
+- [Media queue](media-queue.html) — offline photo uploads that resume
 - [HTTP cache](cache.html) — TTL GET/JSON caching (`cachedJson`)
 - [AI.md](ai.html) — paste into Cursor / Copilot / ChatGPT to implement OfflineJS
 - [Sync engine](sync.html) · [Storage](storage.html) · [Performance](performance.html)

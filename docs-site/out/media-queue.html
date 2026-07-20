@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="OfflineJS — write locally, sync automatically, recover gracefully. The TypeScript offline-first data layer with a durable outbox and conflict strategies you choose."
+    />
+    <title>Media queue · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
+    
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="cache.html">Cache</a><a href="media-queue.html" aria-current="page">Media queue</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>Media queue (<code>@offlinejs/media-queue</code>)</h1><p>Durable <strong>offline media uploads</strong> for the web — think OfflineJS, but for blobs.</p><ul><li>User picks a file → UI can update instantly  </li>
+<li>Images are compressed / resized on-device  </li>
+<li>Upload sits in an <strong>IndexedDB queue</strong>  </li>
+<li>Survives refresh, tab close, offline, flaky networks  </li>
+<li><strong>Chunked resume</strong> from <code>bytesUploaded</code>  </li>
+<li>Progress / complete / error events  </li>
+</ul>
+Video compression is reserved for later; video files still queue and upload in chunks.</p><h2>Install</h2><p>Included with <a href="https://www.npmjs.com/package/@offlinejs/client"><code>@offlinejs/client</code></a>, or:</p><pre><code>pnpm add @offlinejs/media-queue
+# npm i @offlinejs/media-queue</code></pre><h2>Quick start</h2><pre><code>import { createMediaQueue } from &quot;@offlinejs/client&quot;;
+
+const media = createMediaQueue({
+  endpoint: &quot;/api/uploads&quot;,
+  databaseName: &quot;my-app-media&quot;,
+  chunkSize: 256 * 1024,
+  compress: {
+    images: { maxWidth: 1600, maxHeight: 1600, quality: 0.82, mimeType: &quot;image/jpeg&quot; }
+  },
+  getHeaders: () =&gt; ({ Authorization: `Bearer ${token}` }),
+  autoFlush: true // flush when online
+});
+
+media.on(&quot;progress&quot;, ({ id, pct }) =&gt; console.log(id, pct));
+media.on(&quot;complete&quot;, ({ id, url }) =&gt; console.log(&quot;done&quot;, id, url));
+media.on(&quot;error&quot;, ({ id, error }) =&gt; console.warn(id, error));
+
+// Instant enqueue (compress + persist), upload runs in background when online
+const input = document.querySelector&lt;HTMLInputElement&gt;(&quot;#file&quot;)!;
+input.addEventListener(&quot;change&quot;, async () =&gt; {
+  const file = input.files?.[0];
+  if (!file) return;
+  const job = await media.enqueue(file);
+  showPreview(job.previewUrl);
+});
+
+await media.flush(); // optional manual flush</code></pre><h2>How upload works</h2><p>1. <code>enqueue(file)</code> optionally compresses images → stores <strong>job + blob</strong> in IndexedDB  
+2. <code>flush()</code> (or auto on <code>online</code>) uploads <strong>chunks</strong> with:
+   - <code>Content-Range: bytes start-end/total</code>
+   - <code>X-Upload-Id</code>, <code>X-File-Name</code>, <code>X-Chunk-Start</code>, <code>X-Chunk-End</code>, <code>X-Total-Size</code>
+3. After each successful chunk, <code>bytesUploaded</code> is saved → <strong>resume-safe</strong>  
+4. On the final chunk, server should return JSON <code>{ &quot;url&quot;: &quot;https://...&quot; }</code> (or a raw URL string)</p><h2>Server expectations (MVP)</h2><p>Your <code>PUT endpoint</code> should:</p><ul><li>Accept chunk bodies  </li>
+<li>Key uploads by <code>X-Upload-Id</code>  </li>
+<li>Append/store bytes for the range  </li>
+<li>On the last chunk (<code>X-Chunk-End === X-Total-Size</code>), finalize and respond with <code>{ url }</code></li>
+</ul>
+<h2>API</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Method</th><th>Purpose</th></tr></thead><tbody><tr><td><code>enqueue(file)</code></td><td>Compress (images), persist, return <code>MediaJob</code></td></tr><tr><td><code>flush()</code></td><td>Upload pending jobs</td></tr><tr><td><code>list()</code></td><td>All jobs</td></tr><tr><td><code>pause(id)</code> / <code>resume(id?)</code></td><td>Pause one job or resume + flush</td></tr><tr><td><code>remove(id)</code></td><td>Delete job + blob</td></tr><tr><td><code>on(event, fn)</code></td><td><code>enqueue</code> \</td><td><code>progress</code> \</td><td><code>complete</code> \</td><td><code>error</code> \</td><td><code>change</code></td></tr></tbody></table></div><h2>With OfflineJS data layer</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Concern</th><th>Use</th></tr></thead><tbody><tr><td>JSON records / checklists / stock</td><td><code>createOfflineDB</code></td></tr><tr><td>Photo / file uploads</td><td><code>createMediaQueue</code></td></tr><tr><td>TTL GET caching</td><td><code>cachedJson</code></td></tr></tbody></table></div><p>Typical inspection app: OfflineDB for the form fields, media-queue for site photos.
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner footer-inner">
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <strong>OfflineJS</strong>
+          </div>
+          <p class="footer-copy">
+            Write locally. Sync when the network returns. Choose how conflicts resolve —
+            with a sync pipeline you can see.
+          </p>
+          <div class="footer-links">
+            <a href="demo.html">Live demo</a>
+            <a href="quick-start.html">Quick start</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="cache.html">HTTP cache</a>
+            <a href="media-queue.html">Media queue</a>
+            <a href="ai.html">AI.md</a>
+            <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js?v=296300df19"></script>
+    
+  </body>
+</html>
