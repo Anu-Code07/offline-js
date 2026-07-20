@@ -80,37 +80,7 @@ const mobileNav = () => {
   });
 };
 
-const heroParallax = () => {
-  const pipeline = document.querySelector(".hero-pipeline");
-  if (!pipeline || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    return;
-  }
-
-  let ticking = false;
-
-  const update = () => {
-    const scrollY = window.scrollY || 0;
-    const offset = Math.min(scrollY * 0.12, 36);
-    pipeline.style.setProperty("--parallax-y", `${offset}px`);
-    ticking = false;
-  };
-
-  window.addEventListener(
-    "scroll",
-    () => {
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(update);
-      }
-    },
-    { passive: true }
-  );
-
-  update();
-};
-
 document.addEventListener("DOMContentLoaded", () => {
   reveal();
   mobileNav();
-  heroParallax();
 });

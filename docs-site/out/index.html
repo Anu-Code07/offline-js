@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="assets/styles.css?v=e49414b1b7" />
     
   </head>
   <body>
@@ -30,7 +30,21 @@
       <div class="hero-visual" aria-hidden="true">
         <div class="hero-glow hero-glow-a"></div>
         <div class="hero-glow hero-glow-b"></div>
-        <div class="hero-pipeline">
+      </div>
+      <div class="hero-layout">
+        <div class="hero-inner">
+          <p class="brand-hero reveal">OfflineJS</p>
+          <h1 class="hero-headline reveal">Keep writing when the network doesn’t.</h1>
+          <p class="hero-copy reveal">
+            Local writes, a durable sync outbox, and conflict strategies you choose —
+            one TypeScript import to start.
+          </p>
+          <div class="cta-row reveal">
+            <a class="button button-primary" href="demo.html">Try the live demo</a>
+            <a class="button button-secondary" href="quick-start.html">Start building</a>
+          </div>
+        </div>
+        <div class="hero-pipeline" aria-hidden="true">
           <div class="hero-pipe-stage" data-stage="device">
             <span class="hero-pipe-label">Device</span>
             <span class="hero-pipe-detail">IndexedDB</span>
@@ -49,18 +63,6 @@
             <span class="hero-pipe-label">Remote</span>
             <span class="hero-pipe-detail">when online</span>
           </div>
-        </div>
-      </div>
-      <div class="hero-inner">
-        <p class="brand-hero reveal">OfflineJS</p>
-        <h1 class="hero-headline reveal">Keep writing when the network doesn’t.</h1>
-        <p class="hero-copy reveal">
-          Local writes, a durable sync outbox, and conflict strategies you choose —
-          one TypeScript import to start.
-        </p>
-        <div class="cta-row reveal">
-          <a class="button button-primary" href="demo.html">Try the live demo</a>
-          <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
     </section>
@@ -245,7 +247,7 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js"></script>
+    <script src="assets/site.js?v=358c0d16cc"></script>
     
   </body>
 </html>

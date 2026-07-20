@@ -3,6 +3,7 @@
  * Zero-dependency docs site generator.
  * Uses only Node builtins so Vercel never needs package installs.
  */
+const { createHash } = require("node:crypto");
 const { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } = require("node:fs");
 const { dirname, join } = require("node:path");
 
@@ -128,6 +129,14 @@ function assertExists(path, label) {
   }
 }
 
+function assetVersion(filename) {
+  const filePath = join(assets, filename);
+  if (!existsSync(filePath)) {
+    return "0";
+  }
+  return createHash("sha1").update(readFileSync(filePath)).digest("hex").slice(0, 10);
+}
+
 function shell({ title, current, body, head = "", scripts = "" }) {
   const nav = navPages
     .slice(0, 8)
@@ -136,6 +145,9 @@ function shell({ title, current, body, head = "", scripts = "" }) {
         `<a href="${slug}.html"${current === slug ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`
     )
     .join("");
+
+  const stylesV = assetVersion("styles.css");
+  const siteV = assetVersion("site.js");
 
   return `<!doctype html>
 <html lang="en">
@@ -150,7 +162,7 @@ function shell({ title, current, body, head = "", scripts = "" }) {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="assets/styles.css?v=${stylesV}" />
     ${head}
   </head>
   <body>
@@ -184,7 +196,7 @@ function shell({ title, current, body, head = "", scripts = "" }) {
         </div>
       </footer>
     </div>
-    <script src="assets/site.js"></script>
+    <script src="assets/site.js?v=${siteV}"></script>
     ${scripts}
   </body>
 </html>`;
@@ -327,7 +339,21 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
       <div class="hero-visual" aria-hidden="true">
         <div class="hero-glow hero-glow-a"></div>
         <div class="hero-glow hero-glow-b"></div>
-        <div class="hero-pipeline">
+      </div>
+      <div class="hero-layout">
+        <div class="hero-inner">
+          <p class="brand-hero reveal">OfflineJS</p>
+          <h1 class="hero-headline reveal">Keep writing when the network doesn’t.</h1>
+          <p class="hero-copy reveal">
+            Local writes, a durable sync outbox, and conflict strategies you choose —
+            one TypeScript import to start.
+          </p>
+          <div class="cta-row reveal">
+            <a class="button button-primary" href="demo.html">Try the live demo</a>
+            <a class="button button-secondary" href="quick-start.html">Start building</a>
+          </div>
+        </div>
+        <div class="hero-pipeline" aria-hidden="true">
           <div class="hero-pipe-stage" data-stage="device">
             <span class="hero-pipe-label">Device</span>
             <span class="hero-pipe-detail">IndexedDB</span>
@@ -346,18 +372,6 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
             <span class="hero-pipe-label">Remote</span>
             <span class="hero-pipe-detail">when online</span>
           </div>
-        </div>
-      </div>
-      <div class="hero-inner">
-        <p class="brand-hero reveal">OfflineJS</p>
-        <h1 class="hero-headline reveal">Keep writing when the network doesn’t.</h1>
-        <p class="hero-copy reveal">
-          Local writes, a durable sync outbox, and conflict strategies you choose —
-          one TypeScript import to start.
-        </p>
-        <div class="cta-row reveal">
-          <a class="button button-primary" href="demo.html">Try the live demo</a>
-          <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
     </section>
@@ -579,12 +593,15 @@ function renderDemo() {
     </main>
   `;
 
+  const demoCssV = assetVersion("demo-stock.css");
+  const demoJsV = assetVersion("demo-stock.js");
+
   return shell({
     title: "Live demo",
     current: "demo",
     body,
-    head: '<link rel="stylesheet" href="assets/demo-stock.css" />',
-    scripts: '<script type="module" src="assets/demo-stock.js"></script>'
+    head: `<link rel="stylesheet" href="assets/demo-stock.css?v=${demoCssV}" />`,
+    scripts: `<script type="module" src="assets/demo-stock.js?v=${demoJsV}"></script>`
   });
 }
 
