@@ -85,13 +85,35 @@ export class MutationQueue {
   }
 
   async due(
-    options: QueueProcessingOptions = defaultQueueProcessingOptions
+    options: QueueProcessingOptions = defaultQueueProcessingOptions,
+    collection?: string
   ): Promise<QueuedMutation[]> {
     if (this.paused) {
       return [];
     }
 
-    return this.selectDue(await this.all(), options);
+    // Prefer status-filtered reads so sync does not scan the entire outbox.
+    const pending = await this.storage.find<QueuedMutation>(this.collectionName, {
+      filters: collection ? { status: "pending", collection } : { status: "pending" },
+      orderBy: "priority",
+      sort: "desc",
+      limit: Math.max(options.batchSize * 4, options.batchSize)
+    });
+    const failed = await this.storage.find<QueuedMutation>(this.collectionName, {
+      filters: collection ? { status: "failed", collection } : { status: "failed" },
+      orderBy: "priority",
+      sort: "desc",
+      limit: Math.max(options.batchSize * 4, options.batchSize)
+    });
+
+    const candidates = [...pending, ...failed].sort((left, right) => {
+      if (left.priority !== right.priority) {
+        return right.priority - left.priority;
+      }
+      return left.createdAt - right.createdAt;
+    });
+
+    return this.selectDue(candidates, options);
   }
 
   /** Filter an already-loaded queue snapshot without an extra storage read. */

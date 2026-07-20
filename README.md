@@ -371,6 +371,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | [FAQ](./docs/faq.md) | Common consumer questions |
 | [Architecture](./docs/architecture.md) | How the pieces fit together |
 | [Benchmarks](./docs/benchmarks.md) | Measured adapter scores (`pnpm bench`) |
+| [Performance](./docs/performance.md) | setMany, SQL pushdown, lean sync |
 
 ### Docs site
 

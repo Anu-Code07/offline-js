@@ -50,14 +50,14 @@ export class SyncEngine {
 
     this.running = true;
     const options = this.processingOptions();
-    const queued = await this.queue.all();
-    this.events.emit("sync:start", { mode: "full", queued: queued.length });
+    const due = await this.queue.due(options, collection);
+    this.events.emit("sync:start", { mode: "full", queued: due.length });
 
     try {
       const pushResult =
         this.syncOptions.push === false
           ? { completed: 0, failed: 0 }
-          : await this.push(collection, queued, options);
+          : await this.pushDue(due, options);
 
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
@@ -85,7 +85,20 @@ export class SyncEngine {
     });
     const records = Array.isArray(response.data) ? response.data : [];
 
+    if (records.length === 0) {
+      return records;
+    }
+
+    if (typeof this.storage.setMany === "function") {
+      await this.storage.setMany(collection, records);
+      return records;
+    }
+
     await this.storage.transaction([collection], async (store) => {
+      if (typeof store.setMany === "function") {
+        await store.setMany(collection, records);
+        return;
+      }
       for (const record of records) {
         await store.set(collection, record);
       }
@@ -94,28 +107,37 @@ export class SyncEngine {
     return records;
   }
 
-  private async push(
-    collection?: string,
-    queued?: QueuedMutation[],
-    options: QueueProcessingOptions = this.processingOptions()
+  private async pushDue(
+    due: QueuedMutation[],
+    options: QueueProcessingOptions
   ): Promise<SyncResult> {
-    const mutations = queued ?? (await this.queue.all());
-    const due = this.queue
-      .selectDue(mutations, options)
-      .filter((mutation) => !collection || mutation.collection === collection);
     let completed = 0;
     let failed = 0;
+    const concurrency = Math.min(4, Math.max(1, options.batchSize));
 
-    for (const mutation of due) {
-      try {
-        await this.pushMutation(mutation);
-        await this.queue.remove(mutation.id);
-        this.events.emit("queue:complete", mutation);
-        completed += 1;
-      } catch (error) {
-        await this.queue.markAttempt(mutation.id);
-        this.events.emit("error", error instanceof Error ? error : new Error(String(error)));
-        failed += 1;
+    for (let index = 0; index < due.length; index += concurrency) {
+      const slice = due.slice(index, index + concurrency);
+      const results = await Promise.all(
+        slice.map(async (mutation) => {
+          try {
+            await this.pushMutation(mutation);
+            await this.queue.remove(mutation.id);
+            this.events.emit("queue:complete", mutation);
+            return "completed" as const;
+          } catch (error) {
+            await this.queue.markAttempt(mutation.id);
+            this.events.emit("error", error instanceof Error ? error : new Error(String(error)));
+            return "failed" as const;
+          }
+        })
+      );
+
+      for (const result of results) {
+        if (result === "completed") {
+          completed += 1;
+        } else {
+          failed += 1;
+        }
       }
     }
 

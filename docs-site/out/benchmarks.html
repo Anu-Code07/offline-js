@@ -19,40 +19,42 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="plugins.html">Plugins</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>OfflineJS Benchmarks</h1><p>Generated: 2026-07-20T06:53:36.500Z · Node v22.14.0</p><table><thead><tr><th>Adapter</th><th>Metric</th><th>Dataset</th><th>Duration</th><th>Throughput</th></tr></thead><tbody>
+        <h1>OfflineJS Benchmarks</h1><p>Generated: 2026-07-20T07:16:02.466Z · Node v22.14.0</p><table><thead><tr><th>Adapter</th><th>Metric</th><th>Dataset</th><th>Duration</th><th>Throughput</th></tr></thead><tbody>
 </tbody></table>@@TABLE_DIVIDER@@
-<table><thead><tr><th>memory</th><th>writes</th><th>10,000</th><th>22.00ms</th><th>454,581 ops/s</th></tr></thead><tbody>
-<tr><td>memory</td><td>batch-writes</td><td>10,000</td><td>23.90ms</td><td>418,380 ops/s</td></tr>
-<tr><td>memory</td><td>find</td><td>10,000</td><td>4.03ms</td><td>24,832 ops/s</td></tr>
-<tr><td>memory</td><td>indexed-find</td><td>10,000</td><td>0.37ms</td><td>271,940 ops/s</td></tr>
-<tr><td>indexeddb</td><td>writes</td><td>10,000</td><td>85650.81ms</td><td>117 ops/s</td></tr>
-<tr><td>indexeddb</td><td>batch-writes</td><td>10,000</td><td>124293.98ms</td><td>80 ops/s</td></tr>
-<tr><td>indexeddb</td><td>find</td><td>10,000</td><td>111.57ms</td><td>896 ops/s</td></tr>
-<tr><td>indexeddb</td><td>indexed-find</td><td>10,000</td><td>55.21ms</td><td>1,811 ops/s</td></tr>
-<tr><td>sqlite</td><td>writes</td><td>10,000</td><td>28.17ms</td><td>354,961 ops/s</td></tr>
-<tr><td>sqlite</td><td>batch-writes</td><td>10,000</td><td>36.72ms</td><td>272,306 ops/s</td></tr>
-<tr><td>sqlite</td><td>find</td><td>10,000</td><td>9.71ms</td><td>10,303 ops/s</td></tr>
-<tr><td>sqlite</td><td>indexed-find</td><td>10,000</td><td>4.82ms</td><td>20,759 ops/s</td></tr>
+<table><thead><tr><th>memory</th><th>writes</th><th>5,000</th><th>13.77ms</th><th>363,165 ops/s</th></tr></thead><tbody>
+<tr><td>memory</td><td>batch-writes</td><td>5,000</td><td>13.23ms</td><td>378,006 ops/s</td></tr>
+<tr><td>memory</td><td>find</td><td>5,000</td><td>2.36ms</td><td>42,419 ops/s</td></tr>
+<tr><td>memory</td><td>indexed-find</td><td>5,000</td><td>0.34ms</td><td>294,035 ops/s</td></tr>
+<tr><td>indexeddb</td><td>writes</td><td>5,000</td><td>268.15ms</td><td>18,647 ops/s</td></tr>
+<tr><td>indexeddb</td><td>batch-writes</td><td>5,000</td><td>92.23ms</td><td>54,210 ops/s</td></tr>
+<tr><td>indexeddb</td><td>find</td><td>5,000</td><td>31.04ms</td><td>3,222 ops/s</td></tr>
+<tr><td>indexeddb</td><td>indexed-find</td><td>5,000</td><td>15.74ms</td><td>6,352 ops/s</td></tr>
+<tr><td>sqlite</td><td>writes</td><td>5,000</td><td>15.37ms</td><td>325,333 ops/s</td></tr>
+<tr><td>sqlite</td><td>batch-writes</td><td>5,000</td><td>17.76ms</td><td>281,537 ops/s</td></tr>
+<tr><td>sqlite</td><td>find</td><td>5,000</td><td>3.31ms</td><td>1,509,827 ops/s</td></tr>
+<tr><td>sqlite</td><td>indexed-find</td><td>5,000</td><td>2.88ms</td><td>34,704 ops/s</td></tr>
 </tbody></table>
 <h2>Notes</h2><ul><li>Writes measure sequential storage.set throughput.</li>
-<li>Find measures filtered+sorted+limited queries over the seeded dataset.</li>
+<li>Batch writes use storage.setMany when available (one durable batch path).</li>
+<li>Find measures filtered+sorted+limited query latency; records = page size returned.</li>
 <li>Indexed find creates a secondary index on <code>group</code>, then times equality lookup.</li>
-<li>ops/s for find metrics uses returned row count (page size), not rows scanned.</li>
+<li>Prefer durationMs / percentiles for finds — ops/s on page size is not rows scanned.</li>
 </ul><h2>How to reproduce</h2><pre><code>pnpm bench
 # optional: OFFLINEJS_BENCH_RECORDS=50000 pnpm bench</code></pre><p>This report is generated by exercising the real <code>@offlinejs/storage-*</code> adapters through
-<code>@offlinejs/benchmarks</code> (<code>runPerformanceReport</code>). Scores below are from this machine run.</p><h2>What was optimized</h2><p>Recent performance work targets hot paths the suite measures:</p><ul><li>Memory finds clone only the returned page, not the full collection</li>
+<code>@offlinejs/benchmarks</code> (<code>runPerformanceReport</code>). Scores below are from this machine run.</p><h2>What was optimized</h2><p>Recent performance work targets hot paths the suite measures:</p><ul><li>IndexedDB / memory / SQLite / OPFS <code>setMany</code> — one durable batch transaction</li>
+<li>Memory finds clone only the returned page; index lookups hydrate only the requested window</li>
 <li>Shared <code>applyQuery</code> skips redundant filter/sort copies</li>
-<li>IndexedDB / SQLite indexed finds batch record hydration (no N+1 waits)</li>
-<li>Queue/sync share one queue snapshot per sync pass</li>
+<li>SQLite equality + order/limit pushdown via <code>json_extract</code> when engine-safe</li>
+<li>Queue/sync status-filtered due reads + concurrent push batches</li>
 <li>Collection <code>paginate</code> uses a single storage read</li>
 </ul>
       </article>

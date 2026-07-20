@@ -44,7 +44,38 @@ export interface PerformanceScore {
   opsPerSecond: number;
   records: number;
   datasetSize: number;
+  /** Rows scanned / written for latency metrics (find uses page size in `records`). */
+  rowsScanned?: number;
+  p50Ms?: number;
+  p95Ms?: number;
+  p99Ms?: number;
 }
+
+/** Run a timed operation repeatedly and return percentile latency stats. */
+export const measurePercentiles = async (
+  name: string,
+  runs: number,
+  operation: () => Promise<void>
+): Promise<{ name: string; p50Ms: number; p95Ms: number; p99Ms: number; samples: number[] }> => {
+  const samples: number[] = [];
+  for (let index = 0; index < runs; index += 1) {
+    const startedAt = performance.now();
+    await operation();
+    samples.push(performance.now() - startedAt);
+  }
+  samples.sort((left, right) => left - right);
+  const pick = (percentile: number): number => {
+    const rank = Math.min(samples.length - 1, Math.max(0, Math.ceil((percentile / 100) * samples.length) - 1));
+    return samples[rank] ?? 0;
+  };
+  return {
+    name,
+    p50Ms: pick(50),
+    p95Ms: pick(95),
+    p99Ms: pick(99),
+    samples
+  };
+};
 
 export const createBenchmarkRecord = (index: number): EntityRecord => ({
   id: `record_${index}`,
@@ -76,10 +107,14 @@ export const benchmarkAdapterBatchWrites = async (
   const startedAt = performance.now();
 
   for (let index = 0; index < records; index += batchSize) {
-    const batch = Array.from({ length: Math.min(batchSize, records - index) }, (_, offset) =>
-      options.storage.set(collection, createBenchmarkRecord(index + offset))
+    const chunk = Array.from({ length: Math.min(batchSize, records - index) }, (_, offset) =>
+      createBenchmarkRecord(index + offset)
     );
-    await Promise.all(batch);
+    if (typeof options.storage.setMany === "function") {
+      await options.storage.setMany(collection, chunk);
+    } else {
+      await Promise.all(chunk.map((record) => options.storage.set(collection, record)));
+    }
   }
 
   return toResult(`${options.storage.name}:batch-writes`, records, startedAt, records);
@@ -190,9 +225,10 @@ export const runPerformanceReport = async (options: {
     node: typeof process !== "undefined" ? process.version : "unknown",
     notes: [
       "Writes measure sequential storage.set throughput.",
-      "Find measures filtered+sorted+limited queries over the seeded dataset.",
+      "Batch writes use storage.setMany when available (one durable batch path).",
+      "Find measures filtered+sorted+limited query latency; records = page size returned.",
       "Indexed find creates a secondary index on `group`, then times equality lookup.",
-      "ops/s for find metrics uses returned row count (page size), not rows scanned."
+      "Prefer durationMs / percentiles for finds — ops/s on page size is not rows scanned."
     ],
     adapters,
     scores

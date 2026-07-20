@@ -20,6 +20,7 @@ const pages = [
   ["storage", "docs/storage-adapters.md", "Storage", "docs"],
   ["sync", "docs/sync-engine.md", "Sync", "docs"],
   ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
+  ["performance", "docs/performance.md", "Performance", "docs"],
   ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["contracts", "docs/public-contracts.md", "Contracts", "docs"],
   ["practices", "docs/best-practices.md", "Practices", "docs"],
@@ -191,7 +192,9 @@ function loadBenchmarkHighlights() {
         scores.find((score) => score.adapter === adapter && score.metric === metric);
 
       const memoryWrites = pick("memory", "writes");
+      const memoryBatch = pick("memory", "batch-writes");
       const memoryIndexed = pick("memory", "indexed-find");
+      const idbBatch = pick("indexeddb", "batch-writes");
       const idbIndexed = pick("indexeddb", "indexed-find");
       const sqliteIndexed = pick("sqlite", "indexed-find");
       const datasetSize = report.adapters?.[0]?.datasetSize ?? 10_000;
@@ -200,11 +203,18 @@ function loadBenchmarkHighlights() {
         datasetSize,
         generatedAt: report.generatedAt,
         items: [
-          memoryWrites
+          memoryBatch || memoryWrites
             ? {
-                label: "Memory writes",
-                value: formatOps(memoryWrites.opsPerSecond),
-                detail: "ops/s sequential set"
+                label: memoryBatch ? "Memory batch writes" : "Memory writes",
+                value: formatOps((memoryBatch ?? memoryWrites).opsPerSecond),
+                detail: memoryBatch ? "setMany ops/s" : "ops/s sequential set"
+              }
+            : null,
+          idbBatch
+            ? {
+                label: "IndexedDB batch writes",
+                value: formatOps(idbBatch.opsPerSecond),
+                detail: "setMany · one transaction"
               }
             : null,
           memoryIndexed
@@ -228,7 +238,7 @@ function loadBenchmarkHighlights() {
                 detail: "SQL adapter path"
               }
             : null
-        ].filter(Boolean)
+        ].filter(Boolean).slice(0, 4)
       };
     } catch {
       // Fall through to empty highlights.
@@ -305,7 +315,7 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
       <div class="hero-inner">
         <h1 class="brand-hero reveal">OfflineJS</h1>
         <p class="hero-copy reveal">
-          Write locally, queue mutations, sync when the link returns — one TypeScript collection API for offline-first apps.
+          The TypeScript offline-first data layer: local writes, a durable sync outbox, conflict strategies you choose — one import to start.
         </p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="demo.html">Watch the sync pipeline</a>
@@ -319,9 +329,9 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Why OfflineJS</p>
-        <h2 class="section-title reveal">Device → outbox → remote.</h2>
+        <h2 class="section-title reveal">Reliability you can see. Speed where it counts.</h2>
         <p class="section-copy reveal">
-          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic. OfflineJS turns that into a calm collection API you can see in the live stock demo.
+          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic. OfflineJS turns that into a calm collection API — with a live stock demo and Redux-style DevTools so the outbox is never a black box.
         </p>
         <div class="feature-strip">
           <article class="feature reveal">
@@ -329,12 +339,36 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
             <p>UI updates immediately from durable local storage while mutations wait for reconnect.</p>
           </article>
           <article class="feature reveal">
-            <h3>Durable outbox</h3>
-            <p>Queued mutations retry with priority, pause/resume, and exponential backoff until they land remotely.</p>
+            <h3>Batched durable writes</h3>
+            <p><code>setMany</code> lands many records in one IndexedDB/SQLite transaction — built for real ingest, not toy loops.</p>
           </article>
           <article class="feature reveal">
-            <h3>Compose as you grow</h3>
-            <p>Start with <code>@offlinejs/client</code>, then add broadcast, service worker, SQLite, encryption, or auth packages.</p>
+            <h3>Lean sync path</h3>
+            <p>Status-filtered outbox reads, concurrent push batches, and engine pushdown for equality queries.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Product</p>
+        <h2 class="section-title reveal">Market the outcome — prove the engine.</h2>
+        <p class="section-copy reveal">
+          Lead with offline UX and DX. Use measured adapter scores as proof, not hype. Reproduce anytime with <code>pnpm bench</code>.
+        </p>
+        <div class="feature-strip">
+          <article class="feature reveal">
+            <h3>One install</h3>
+            <p><code>@offlinejs/client</code> covers createOfflineDB, storage presets, React hooks, and common plugins.</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Visible trust</h3>
+            <p>Device → outbox → remote demo plus floating DevTools (Ctrl/⌘+Shift+O).</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Honest metrics</h3>
+            <p>Write throughput, find latency, indexed lookup — documented methodology on the benchmarks page.</p>
           </article>
         </div>
       </div>
@@ -366,10 +400,9 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
         <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, DevTools, contracts, and the completed v0.2–v0.8 foundations.</p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
-          <a class="button button-secondary" href="storage.html">Storage</a>
+          <a class="button button-secondary" href="performance.html">Performance</a>
           <a class="button button-secondary" href="benchmarks.html">Benchmarks</a>
           <a class="button button-secondary" href="plugins.html">DevTools</a>
-          <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>
     </section>

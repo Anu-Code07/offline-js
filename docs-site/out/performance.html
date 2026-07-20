@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>Performance · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html" aria-current="page">Performance</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <div class="page doc-layout">
+      <aside class="sidebar reveal" aria-label="Documentation">
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html" aria-current="page">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+      </aside>
+      <article class="content reveal">
+        <h1>Performance</h1><p>OfflineJS is built so local writes stay fast and sync stays cheap as datasets grow.</p><h2>What we optimize for</h2><p>1. <strong>Local UX first</strong> — <code>collection.create/update</code> must feel instant.
+2. <strong>Durable batches</strong> — adapters that support <code>setMany</code> write many records in one transaction.
+3. <strong>Engine pushdown</strong> — equality filters, order, and limits run in SQLite/IndexedDB when possible.
+4. <strong>Lean sync</strong> — the outbox is queried by status, not fully scanned on every sync.
+5. <strong>Honest benches</strong> — report latency and rows written; do not confuse page-size ops/s with scanned rows.</p><h2>Bulk writes</h2><pre><code>import { createIndexedDBStorage } from &quot;@offlinejs/client&quot;;
+
+const storage = createIndexedDBStorage({ databaseName: &quot;app&quot; });
+
+if (storage.setMany) {
+  await storage.setMany(&quot;stock&quot;, rows); // one IndexedDB readwrite transaction
+}</code></pre><p>IndexedDB <code>set</code> / <code>setMany</code> now share a single transaction for:</p><ul><li>previous-row reads</li>
+<li>unique index checks</li>
+<li>record puts</li>
+<li>secondary index entry writes</li>
+</ul>
+<h2>SQLite</h2><p>Use a real driver for production Node workloads:</p><pre><code>import Database from &quot;better-sqlite3&quot;;
+import { createBetterSqlite3DriverAsync, createSQLiteStorage } from &quot;@offlinejs/client&quot;;
+
+const driver = createBetterSqlite3DriverAsync(new Database(&quot;offline.db&quot;));
+const storage = createSQLiteStorage({ driver });</code></pre><p>Equality filters + <code>orderBy</code> / <code>limit</code> / <code>offset</code> push into SQL via <code>json_extract</code> when the query is engine-safe. Complex <code>search</code> / range operators still use JS <code>applyQuery</code>.</p><h2>Sync path</h2><ul><li>Queue <code>due()</code> loads <code>pending</code> + <code>failed</code> with status filters (not the entire outbox)</li>
+<li>Pull uses <code>setMany</code> when the adapter provides it</li>
+<li>Push runs a small concurrent batch (up to 4) safely</li>
+</ul>
+<h2>Reproduce scores</h2><pre><code>pnpm bench
+# OFFLINEJS_BENCH_RECORDS=50000 pnpm bench</code></pre><p>See <a href="./benchmarks.md">Benchmarks</a> for the latest measured table. Prefer <strong>durationMs</strong> (and percentiles when published) for find metrics.
+</p>
+      </article>
+    </div>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+    
+  </body>
+</html>

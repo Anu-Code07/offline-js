@@ -408,11 +408,29 @@ var MutationQueue = class {
       return left.createdAt - right.createdAt;
     });
   }
-  async due(options = defaultQueueProcessingOptions) {
+  async due(options = defaultQueueProcessingOptions, collection) {
     if (this.paused) {
       return [];
     }
-    return this.selectDue(await this.all(), options);
+    const pending = await this.storage.find(this.collectionName, {
+      filters: collection ? { status: "pending", collection } : { status: "pending" },
+      orderBy: "priority",
+      sort: "desc",
+      limit: Math.max(options.batchSize * 4, options.batchSize)
+    });
+    const failed = await this.storage.find(this.collectionName, {
+      filters: collection ? { status: "failed", collection } : { status: "failed" },
+      orderBy: "priority",
+      sort: "desc",
+      limit: Math.max(options.batchSize * 4, options.batchSize)
+    });
+    const candidates = [...pending, ...failed].sort((left, right) => {
+      if (left.priority !== right.priority) {
+        return right.priority - left.priority;
+      }
+      return left.createdAt - right.createdAt;
+    });
+    return this.selectDue(candidates, options);
   }
   /** Filter an already-loaded queue snapshot without an extra storage read. */
   selectDue(mutations, options = defaultQueueProcessingOptions) {
@@ -478,6 +496,7 @@ var MemoryStorageAdapter = class {
   contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "ephemeral",
     transactions: "atomic"
@@ -498,13 +517,29 @@ var MemoryStorageAdapter = class {
     return record ? clone(record) : null;
   }
   async set(collection, value) {
-    const previous = this.records.get(collection)?.get(value.id);
-    if (previous) {
-      this.unindexRecord(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+  async setMany(collection, values) {
+    if (values.length === 0) {
+      return;
     }
-    this.assertUniqueIndexes(collection, value, previous?.id);
-    this.ensureCollection(collection).set(value.id, clone(value));
-    this.indexRecord(collection, value);
+    const byId = /* @__PURE__ */ new Map();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
+    for (const value of records) {
+      const previous = this.records.get(collection)?.get(value.id);
+      this.assertUniqueIndexes(collection, value, previous?.id);
+    }
+    for (const value of records) {
+      const previous = this.records.get(collection)?.get(value.id);
+      if (previous) {
+        this.unindexRecord(collection, previous);
+      }
+      this.ensureCollection(collection).set(value.id, clone(value));
+      this.indexRecord(collection, value);
+    }
   }
   async delete(collection, id) {
     const previous = this.records.get(collection)?.get(id);
@@ -726,10 +761,10 @@ var SyncEngine = class {
     }
     this.running = true;
     const options = this.processingOptions();
-    const queued = await this.queue.all();
-    this.events.emit("sync:start", { mode: "full", queued: queued.length });
+    const due = await this.queue.due(options, collection);
+    this.events.emit("sync:start", { mode: "full", queued: due.length });
     try {
-      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection, queued, options);
+      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.pushDue(due, options);
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
       }
@@ -749,28 +784,50 @@ var SyncEngine = class {
       ...since === void 0 ? {} : { query: { since } }
     });
     const records = Array.isArray(response.data) ? response.data : [];
+    if (records.length === 0) {
+      return records;
+    }
+    if (typeof this.storage.setMany === "function") {
+      await this.storage.setMany(collection, records);
+      return records;
+    }
     await this.storage.transaction([collection], async (store) => {
+      if (typeof store.setMany === "function") {
+        await store.setMany(collection, records);
+        return;
+      }
       for (const record of records) {
         await store.set(collection, record);
       }
     });
     return records;
   }
-  async push(collection, queued, options = this.processingOptions()) {
-    const mutations = queued ?? await this.queue.all();
-    const due = this.queue.selectDue(mutations, options).filter((mutation) => !collection || mutation.collection === collection);
+  async pushDue(due, options) {
     let completed = 0;
     let failed = 0;
-    for (const mutation of due) {
-      try {
-        await this.pushMutation(mutation);
-        await this.queue.remove(mutation.id);
-        this.events.emit("queue:complete", mutation);
-        completed += 1;
-      } catch (error) {
-        await this.queue.markAttempt(mutation.id);
-        this.events.emit("error", error instanceof Error ? error : new Error(String(error)));
-        failed += 1;
+    const concurrency = Math.min(4, Math.max(1, options.batchSize));
+    for (let index = 0; index < due.length; index += concurrency) {
+      const slice = due.slice(index, index + concurrency);
+      const results = await Promise.all(
+        slice.map(async (mutation) => {
+          try {
+            await this.pushMutation(mutation);
+            await this.queue.remove(mutation.id);
+            this.events.emit("queue:complete", mutation);
+            return "completed";
+          } catch (error) {
+            await this.queue.markAttempt(mutation.id);
+            this.events.emit("error", error instanceof Error ? error : new Error(String(error)));
+            return "failed";
+          }
+        })
+      );
+      for (const result of results) {
+        if (result === "completed") {
+          completed += 1;
+        } else {
+          failed += 1;
+        }
       }
     }
     return { completed, failed };
@@ -1151,9 +1208,10 @@ var IndexedDBStorageAdapter = class {
   contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "durable",
-    transactions: "best-effort"
+    transactions: "atomic"
   };
   databaseName;
   version;
@@ -1169,26 +1227,70 @@ var IndexedDBStorageAdapter = class {
     return row ? clone(row.value) : null;
   }
   async set(collection, value) {
-    const previous = await this.get(collection, value.id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+  async setMany(collection, values) {
+    if (values.length === 0) {
+      return;
     }
-    await this.assertUniqueIndexes(collection, value, previous?.id);
-    const row = {
-      collection,
-      id: value.id,
-      key: this.key(collection, value.id),
-      value: clone(value)
-    };
-    await this.request(this.store("readwrite").put(row));
-    await this.writeIndexEntries(collection, value);
+    const byId = /* @__PURE__ */ new Map();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
+    await this.runInTransaction(
+      [STORE_NAME, INDEX_STORE_NAME, INDEX_ENTRIES_STORE],
+      "readwrite",
+      async (transaction) => {
+        const recordStore = transaction.objectStore(STORE_NAME);
+        const indexStore = transaction.objectStore(INDEX_STORE_NAME);
+        const entryStore = transaction.objectStore(INDEX_ENTRIES_STORE);
+        const definitions = await this.listIndexesFromStore(indexStore, collection);
+        const batchIds = new Set(records.map((record) => record.id));
+        const previousRows = await Promise.all(
+          records.map(
+            (record) => this.request(recordStore.get(this.key(collection, record.id)))
+          )
+        );
+        for (const record of records) {
+          await this.assertUniqueIndexesInStore(entryStore, definitions, collection, record, batchIds);
+        }
+        for (const previous of previousRows) {
+          if (previous) {
+            await this.removeIndexEntriesInStore(entryStore, definitions, collection, previous.value);
+          }
+        }
+        for (const record of records) {
+          const row = {
+            collection,
+            id: record.id,
+            key: this.key(collection, record.id),
+            value: clone(record)
+          };
+          await this.request(recordStore.put(row));
+          await this.writeIndexEntriesInStore(entryStore, definitions, collection, record);
+        }
+      }
+    );
   }
   async delete(collection, id) {
-    const previous = await this.get(collection, id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
-    }
-    await this.request(this.store("readwrite").delete(this.key(collection, id)));
+    await this.runInTransaction(
+      [STORE_NAME, INDEX_STORE_NAME, INDEX_ENTRIES_STORE],
+      "readwrite",
+      async (transaction) => {
+        const recordStore = transaction.objectStore(STORE_NAME);
+        const indexStore = transaction.objectStore(INDEX_STORE_NAME);
+        const entryStore = transaction.objectStore(INDEX_ENTRIES_STORE);
+        const previous = await this.request(
+          recordStore.get(this.key(collection, id))
+        );
+        if (previous) {
+          const definitions = await this.listIndexesFromStore(indexStore, collection);
+          await this.removeIndexEntriesInStore(entryStore, definitions, collection, previous.value);
+        }
+        await this.request(recordStore.delete(this.key(collection, id)));
+      }
+    );
   }
   async find(collection, query) {
     const indexed = await this.findViaIndex(collection, query);
@@ -1300,7 +1402,50 @@ var IndexedDBStorageAdapter = class {
     };
   }
   async assertUniqueIndexes(collection, record, ignoreId) {
-    for (const definition of await this.listIndexes(collection)) {
+    const definitions = await this.listIndexes(collection);
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readonly", async (transaction) => {
+      await this.assertUniqueIndexesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        definitions,
+        collection,
+        record,
+        ignoreId ? /* @__PURE__ */ new Set([ignoreId, record.id]) : /* @__PURE__ */ new Set([record.id])
+      );
+    });
+  }
+  async writeIndexEntries(collection, record, definitions) {
+    const indexes = definitions ?? await this.listIndexes(collection);
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readwrite", async (transaction) => {
+      await this.writeIndexEntriesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        indexes,
+        collection,
+        record
+      );
+    });
+  }
+  async removeIndexEntries(collection, record) {
+    const definitions = await this.listIndexes(collection);
+    await this.runInTransaction(INDEX_ENTRIES_STORE, "readwrite", async (transaction) => {
+      await this.removeIndexEntriesInStore(
+        transaction.objectStore(INDEX_ENTRIES_STORE),
+        definitions,
+        collection,
+        record
+      );
+    });
+  }
+  async listIndexesFromStore(store, collection) {
+    const rows = await this.request(store.getAll());
+    return rows.filter((row) => !collection || row.collection === collection || row.id.startsWith(`${collection}:`)).map((row) => {
+      const definition = { ...row };
+      delete definition.id;
+      return clone(definition);
+    });
+  }
+  async assertUniqueIndexesInStore(entryStore, definitions, collection, record, allowedIds) {
+    const lookupIndex = entryStore.index(LOOKUP_INDEX);
+    for (const definition of definitions) {
       if (!definition.unique) {
         continue;
       }
@@ -1309,17 +1454,14 @@ var IndexedDBStorageAdapter = class {
         definition.name,
         serializeCompoundIndexValue(readIndexFields(record, definition.fields))
       );
-      const entries = await this.request(
-        this.entryLookup("readonly").getAll(lookup)
-      );
-      if (entries.some((entry) => entry.recordId !== record.id && entry.recordId !== ignoreId)) {
+      const entries = await this.request(lookupIndex.getAll(lookup));
+      if (entries.some((entry) => !allowedIds.has(entry.recordId))) {
         throw new Error(`Unique index "${definition.name}" violated for ${collection}`);
       }
     }
   }
-  async writeIndexEntries(collection, record, definitions) {
-    const indexes = definitions ?? await this.listIndexes(collection);
-    for (const definition of indexes) {
+  async writeIndexEntriesInStore(entryStore, definitions, collection, record) {
+    for (const definition of definitions) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
       const entry = {
         collection,
@@ -1329,17 +1471,36 @@ var IndexedDBStorageAdapter = class {
         recordId: record.id,
         valueKey
       };
-      await this.request(this.entryStore("readwrite").put(entry));
+      await this.request(entryStore.put(entry));
     }
   }
-  async removeIndexEntries(collection, record) {
-    for (const definition of await this.listIndexes(collection)) {
+  async removeIndexEntriesInStore(entryStore, definitions, collection, record) {
+    for (const definition of definitions) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
       await this.request(
-        this.entryStore("readwrite").delete(
-          this.entryId(collection, definition.name, valueKey, record.id)
-        )
+        entryStore.delete(this.entryId(collection, definition.name, valueKey, record.id))
       );
+    }
+  }
+  async runInTransaction(storeNames, mode, run) {
+    const database = await this.database();
+    const transaction = database.transaction(storeNames, mode);
+    const done = new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+      transaction.onerror = () => reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+    });
+    try {
+      const result = await run(transaction);
+      await done;
+      return result;
+    } catch (error) {
+      try {
+        transaction.abort();
+      } catch {
+      }
+      await done.catch(() => void 0);
+      throw error;
     }
   }
   async getCollectionRows(collection) {
@@ -1449,6 +1610,7 @@ var OPFSStorageAdapter = class {
   contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "durable",
     transactions: "best-effort"
@@ -1468,18 +1630,44 @@ var OPFSStorageAdapter = class {
     }
   }
   async set(collection, value) {
-    const previous = await this.get(collection, value.id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+  async setMany(collection, values) {
+    if (values.length === 0) {
+      return;
     }
-    await this.assertUniqueIndexes(collection, value, previous?.id);
-    const file = await this.file(collection, `${value.id}.json`, true);
-    const writable = await file.createWritable();
-    await writable.write(JSON.stringify(value));
-    await writable.close();
-    await this.updateManifest(collection, (ids) => [.../* @__PURE__ */ new Set([...ids, value.id])]);
+    const byId = /* @__PURE__ */ new Map();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
+    const previousById = /* @__PURE__ */ new Map();
+    for (const record of records) {
+      const previous = await this.get(collection, record.id);
+      if (previous) {
+        previousById.set(record.id, previous);
+      }
+      await this.assertUniqueIndexes(collection, record, previous?.id);
+    }
+    const indexes = await this.listIndexes(collection);
+    let indexData = await this.readIndexData(collection);
+    const manifest = await this.readManifest(collection);
+    const ids = new Set(manifest.ids);
+    for (const record of records) {
+      const previous = previousById.get(record.id);
+      if (previous) {
+        indexData = this.removeIndexEntriesInMemory(indexData, indexes, previous);
+      }
+      const file = await this.file(collection, `${record.id}.json`, true);
+      const writable = await file.createWritable();
+      await writable.write(JSON.stringify(record));
+      await writable.close();
+      ids.add(record.id);
+      indexData = this.addIndexEntriesInMemory(indexData, indexes, record);
+    }
+    await this.writeManifest(collection, { ids: [...ids] });
     await this.trackCollection(collection);
-    await this.writeIndexEntries(collection, value);
+    await this.writeIndexData(collection, indexData);
   }
   async delete(collection, id) {
     const previous = await this.get(collection, id);
@@ -1598,15 +1786,7 @@ var OPFSStorageAdapter = class {
     if (indexes.length === 0) {
       return;
     }
-    const data = await this.readIndexData(collection);
-    for (const definition of indexes) {
-      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
-      const bucket = data[definition.name] ?? {};
-      const ids = new Set(bucket[valueKey] ?? []);
-      ids.add(record.id);
-      bucket[valueKey] = [...ids];
-      data[definition.name] = bucket;
-    }
+    const data = this.addIndexEntriesInMemory(await this.readIndexData(collection), indexes, record);
     await this.writeIndexData(collection, data);
   }
   async removeIndexEntries(collection, record) {
@@ -1614,19 +1794,46 @@ var OPFSStorageAdapter = class {
     if (indexes.length === 0) {
       return;
     }
-    const data = await this.readIndexData(collection);
+    const data = this.removeIndexEntriesInMemory(
+      await this.readIndexData(collection),
+      indexes,
+      record
+    );
+    await this.writeIndexData(collection, data);
+  }
+  addIndexEntriesInMemory(data, indexes, record) {
+    const next = { ...data };
     for (const definition of indexes) {
       const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
-      const bucket = data[definition.name];
-      if (!bucket?.[valueKey]) {
+      const bucket = { ...next[definition.name] ?? {} };
+      const ids = new Set(bucket[valueKey] ?? []);
+      ids.add(record.id);
+      bucket[valueKey] = [...ids];
+      next[definition.name] = bucket;
+    }
+    return next;
+  }
+  removeIndexEntriesInMemory(data, indexes, record) {
+    const next = { ...data };
+    for (const definition of indexes) {
+      const valueKey = serializeCompoundIndexValue(readIndexFields(record, definition.fields));
+      const bucket = { ...next[definition.name] ?? {} };
+      if (!bucket[valueKey]) {
         continue;
       }
       bucket[valueKey] = bucket[valueKey].filter((id) => id !== record.id);
       if (bucket[valueKey].length === 0) {
         delete bucket[valueKey];
       }
+      next[definition.name] = bucket;
     }
-    await this.writeIndexData(collection, data);
+    return next;
+  }
+  async writeManifest(collection, manifest) {
+    const file = await this.file(collection, "__manifest.json", true);
+    const writable = await file.createWritable();
+    await writable.write(JSON.stringify(manifest));
+    await writable.close();
   }
   async file(collection, name, create = false) {
     return (await this.collectionDirectory(collection)).getFileHandle(name, { create });

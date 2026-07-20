@@ -39,6 +39,7 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
   readonly contractVersion = STORAGE_ADAPTER_CONTRACT_VERSION;
   readonly capabilities = {
     indexes: true,
+    bulkWrites: true,
     migrations: true,
     persistence: "durable",
     transactions: "best-effort"
@@ -84,18 +85,42 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
   }
 
   async set<TRecord extends EntityRecord>(collection: string, value: TRecord): Promise<void> {
-    await this.initialize();
-    const previous = await this.get(collection, value.id);
-    if (previous) {
-      await this.removeIndexEntries(collection, previous);
+    await this.setMany(collection, [value]);
+  }
+
+  async setMany<TRecord extends EntityRecord>(collection: string, values: TRecord[]): Promise<void> {
+    if (values.length === 0) {
+      return;
     }
 
-    await this.assertUniqueIndexes(collection, value, previous?.id);
-    await this.driver.execute(
-      `INSERT OR REPLACE INTO ${this.tableName} (collection, id, value) VALUES (?, ?, ?)`,
-      [collection, value.id, JSON.stringify(value)]
-    );
-    await this.writeIndexEntries(collection, value);
+    await this.initialize();
+    const byId = new Map<string, TRecord>();
+    for (const value of values) {
+      byId.set(value.id, value);
+    }
+    const records = [...byId.values()];
+
+    const writeBatch = async (): Promise<void> => {
+      for (const value of records) {
+        const previous = await this.get(collection, value.id);
+        if (previous) {
+          await this.removeIndexEntries(collection, previous);
+        }
+        await this.assertUniqueIndexes(collection, value, previous?.id);
+        await this.driver.execute(
+          `INSERT OR REPLACE INTO ${this.tableName} (collection, id, value) VALUES (?, ?, ?)`,
+          [collection, value.id, JSON.stringify(value)]
+        );
+        await this.writeIndexEntries(collection, value);
+      }
+    };
+
+    if (this.driver.transaction) {
+      await this.driver.transaction(writeBatch);
+      return;
+    }
+
+    await writeBatch();
   }
 
   async delete(collection: string, id: string): Promise<void> {
@@ -118,6 +143,18 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
     const indexed = await this.findViaIndex<TRecord>(collection, query);
     if (indexed?.complete) {
       return indexed.records;
+    }
+
+    if (!indexed) {
+      const pushed = this.buildPushedFindSQL(collection, query);
+      if (pushed) {
+        try {
+          const rows = await this.driver.query<SQLiteRecordRow>(pushed.sql, pushed.params);
+          return rows.map((row) => JSON.parse(row.value) as TRecord);
+        } catch {
+          // Driver may not support json_extract — fall through to full scan.
+        }
+      }
     }
 
     const records =
@@ -224,6 +261,61 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
     return rows.map((row) => JSON.parse(row.value) as IndexDefinition);
   }
 
+  /**
+   * Push equality filters + order/limit into SQL when the whole query is engine-safe.
+   * Complex search/operators stay in JS `applyQuery`.
+   */
+  private buildPushedFindSQL<TRecord extends EntityRecord>(
+    collection: string,
+    query?: QueryOptions<TRecord>
+  ): { sql: string; params: unknown[] } | null {
+    if (!query || query.search) {
+      return null;
+    }
+
+    const params: unknown[] = [collection];
+    const clauses = [`collection = ?`];
+
+    if (query.filters) {
+      for (const [field, expected] of Object.entries(query.filters)) {
+        if (expected === undefined) {
+          return null;
+        }
+        if (Array.isArray(expected) || expected === null || typeof expected !== "object") {
+          clauses.push(`json_extract(value, '$.${field}') = ?`);
+          params.push(expected);
+          continue;
+        }
+        if ("eq" in expected && Object.keys(expected).length === 1 && expected.eq !== undefined) {
+          clauses.push(`json_extract(value, '$.${field}') = ?`);
+          params.push(expected.eq);
+          continue;
+        }
+        return null;
+      }
+    }
+
+    let sql = `SELECT value FROM ${this.tableName} WHERE ${clauses.join(" AND ")}`;
+    if (query.orderBy) {
+      sql += ` ORDER BY json_extract(value, '$.${String(query.orderBy)}') ${
+        query.sort === "desc" ? "DESC" : "ASC"
+      }`;
+    }
+    if (query.limit !== undefined) {
+      sql += ` LIMIT ?`;
+      params.push(query.limit);
+    }
+    if (query.offset !== undefined && query.offset > 0) {
+      if (query.limit === undefined) {
+        sql += ` LIMIT -1`;
+      }
+      sql += ` OFFSET ?`;
+      params.push(query.offset);
+    }
+
+    return { sql, params };
+  }
+
   private async findViaIndex<TRecord extends EntityRecord>(
     collection: string,
     query?: QueryOptions<TRecord>
@@ -316,3 +408,9 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
 
 export const createSQLiteStorage = (options: SQLiteStorageOptions): SQLiteStorageAdapter =>
   new SQLiteStorageAdapter(options);
+
+export {
+  createBetterSqlite3Driver,
+  createBetterSqlite3DriverAsync,
+  type BetterSqlite3Database
+} from "./better-sqlite3";

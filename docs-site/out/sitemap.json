@@ -40,6 +40,11 @@
     "url": "/benchmarks.html"
   },
   {
+    "slug": "performance",
+    "title": "Performance",
+    "url": "/performance.html"
+  },
+  {
     "slug": "plugins",
     "title": "Plugins",
     "url": "/plugins.html"
