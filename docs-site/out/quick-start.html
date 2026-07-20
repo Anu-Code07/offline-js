@@ -38,15 +38,16 @@ const db = createOfflineDB({
 
 const todos = db.collection(&quot;todos&quot;);
 await todos.create({ title: &quot;Ship offline sync&quot;, completed: false });
-const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path. Prefer enums like <code>OfflineStorage.IndexedDB</code> over raw strings. Need something specific? Import it from <code>@offlinejs</code> too, or from a focused package like <code>@offlinejs/storage-sqlite</code>.</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
-<li>Mutations enter a durable queue.</li>
+const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path: <code>@offlinejs/client</code>. Prefer enums like <code>OfflineStorage.IndexedDB</code> over raw strings. Need a smaller bundle? Import a focused package like <code>@offlinejs/storage-sqlite</code>, <code>@offlinejs/broadcast</code>, or <code>@offlinejs/sw</code>.</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
+<li>Mutations enter a durable outbox queue.</li>
 <li>Sync resumes when the network returns.</li>
 <li>Conflicts resolve with your chosen strategy.</li>
 </ul>
-<h2>Keep exploring</h2><ul><li><a href="api.html">API Reference</a></li>
+<h2>See it visually</h2><p>The <a href="demo.html">live demo</a> uses a warehouse stock board — device → outbox → remote API — so you can watch queue flush and conflict resolution with real <code>@offlinejs/devtools</code> events.</p><h2>Keep exploring</h2><ul><li><a href="api.html">API Reference</a></li>
 <li><a href="storage.html">Storage Adapters</a></li>
 <li><a href="sync.html">Sync Engine</a></li>
 <li><a href="plugins.html">Plugins</a></li>
+<li><a href="roadmap.html">Roadmap</a></li>
 </ul>
       </article>
     </div>

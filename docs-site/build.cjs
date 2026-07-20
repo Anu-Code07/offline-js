@@ -69,14 +69,18 @@ await todos.create({ title: "Ship offline sync", completed: false });
 const open = await todos.find({ filters: { completed: false } });
 \`\`\`
 
-One package covers the common path. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need something specific? Import it from \`@offlinejs\` too, or from a focused package like \`@offlinejs/storage-sqlite\`.
+One package covers the common path: \`@offlinejs/client\`. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need a smaller bundle? Import a focused package like \`@offlinejs/storage-sqlite\`, \`@offlinejs/broadcast\`, or \`@offlinejs/sw\`.
 
 ## What happens next
 
 - Writes land in local storage immediately.
-- Mutations enter a durable queue.
+- Mutations enter a durable outbox queue.
 - Sync resumes when the network returns.
 - Conflicts resolve with your chosen strategy.
+
+## See it visually
+
+The [live demo](demo.html) uses a warehouse stock board — device → outbox → remote API — so you can watch queue flush and conflict resolution with real \`@offlinejs/devtools\` events.
 
 ## Keep exploring
 
@@ -84,6 +88,7 @@ One package covers the common path. Prefer enums like \`OfflineStorage.IndexedDB
 - [Storage Adapters](storage.html)
 - [Sync Engine](sync.html)
 - [Plugins](plugins.html)
+- [Roadmap](roadmap.html)
 `;
     }
 
@@ -178,10 +183,10 @@ function renderHome() {
       <div class="hero-inner">
         <h1 class="brand-hero reveal">OfflineJS</h1>
         <p class="hero-copy reveal">
-          The offline-first data layer for TypeScript apps that should keep working when the network disappears.
+          Write locally, queue mutations, sync when the link returns — one TypeScript collection API for offline-first apps.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="demo.html">Try the live demo</a>
+          <a class="button button-primary" href="demo.html">Watch the sync pipeline</a>
           <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
@@ -190,9 +195,9 @@ function renderHome() {
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Why OfflineJS</p>
-        <h2 class="section-title reveal">Local writes first. Sync when ready.</h2>
+        <h2 class="section-title reveal">Device → outbox → remote.</h2>
         <p class="section-copy reveal">
-          Stop hand-rolling fetch retries, IndexedDB wrappers, mutation queues, and conflict logic. OfflineJS turns that complexity into a calm collection API.
+          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic. OfflineJS turns that into a calm collection API you can see in the live stock demo.
         </p>
         <div class="feature-strip">
           <article class="feature reveal">
@@ -200,12 +205,12 @@ function renderHome() {
             <p>UI updates immediately from durable local storage while mutations wait for reconnect.</p>
           </article>
           <article class="feature reveal">
-            <h3>Queue with backoff</h3>
-            <p>Persistent mutation queues retry with priority, pause/resume, and exponential backoff.</p>
+            <h3>Durable outbox</h3>
+            <p>Queued mutations retry with priority, pause/resume, and exponential backoff until they land remotely.</p>
           </article>
           <article class="feature reveal">
-            <h3>Pluggable everywhere</h3>
-            <p>Swap storage adapters, transports, plugins, and conflict strategies without changing your app API.</p>
+            <h3>Compose as you grow</h3>
+            <p>Start with <code>@offlinejs/client</code>, then add broadcast, service worker, SQLite, encryption, or auth packages.</p>
           </article>
         </div>
       </div>
@@ -214,18 +219,19 @@ function renderHome() {
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Install</p>
-        <h2 class="section-title reveal">Ship the first offline collection today.</h2>
-        <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
+        <h2 class="section-title reveal">One package for the common path.</h2>
+        <p class="section-copy reveal">Install <code>@offlinejs/client</code>. Prefer storage and conflict enums. Sync rides along.</p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
 
-import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: OfflineStorage.IndexedDB
+  storage: OfflineStorage.IndexedDB,
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 
-await db.collection("todos").create({ title: "Works offline" });</code></pre>
+await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
       </div>
     </section>
 
@@ -233,7 +239,7 @@ await db.collection("todos").create({ title: "Works offline" });</code></pre>
       <div class="section-inner">
         <p class="section-kicker reveal">Docs</p>
         <h2 class="section-title reveal">Explore the system.</h2>
-        <p class="section-copy reveal">Architecture, adapters, sync, plugins, contracts, and the roadmap—all in one place.</p>
+        <p class="section-copy reveal">Architecture, adapters, sync, plugins, contracts, and the completed v0.2–v0.8 foundations.</p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
           <a class="button button-secondary" href="storage.html">Storage</a>
@@ -339,8 +345,8 @@ function renderDemo() {
     title: "Live demo",
     current: "demo",
     body,
-    head: '<link rel="stylesheet" href="assets/demo.css" />',
-    scripts: '<script type="module" src="assets/demo.js"></script>'
+    head: '<link rel="stylesheet" href="assets/demo-stock.css" />',
+    scripts: '<script type="module" src="assets/demo-stock.js"></script>'
   });
 }
 
