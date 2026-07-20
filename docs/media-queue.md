@@ -28,19 +28,20 @@ import { createMediaQueue } from "@offlinejs/client";
 const media = createMediaQueue({
   endpoint: "/api/uploads",
   databaseName: "my-app-media",
-  chunkSize: 256 * 1024,
+  chunkSize: "auto",       // 256 KiB → 1 MiB → 4 MiB by file size
+  concurrency: 3,          // upload multiple jobs in parallel
+  persistIntervalMs: 500,  // coalesce IDB progress writes
   compress: {
     images: { maxWidth: 1600, maxHeight: 1600, quality: 0.82, mimeType: "image/jpeg" }
   },
   getHeaders: () => ({ Authorization: `Bearer ${token}` }),
-  autoFlush: true // flush when online
+  autoFlush: true
 });
 
 media.on("progress", ({ id, pct }) => console.log(id, pct));
 media.on("complete", ({ id, url }) => console.log("done", id, url));
 media.on("error", ({ id, error }) => console.warn(id, error));
 
-// Instant enqueue (compress + persist), upload runs in background when online
 const input = document.querySelector<HTMLInputElement>("#file")!;
 input.addEventListener("change", async () => {
   const file = input.files?.[0];
@@ -49,8 +50,25 @@ input.addEventListener("change", async () => {
   showPreview(job.previewUrl);
 });
 
-await media.flush(); // optional manual flush
+await media.flush();
 ```
+
+## Performance
+
+Built for real camera / field uploads:
+
+| Lever | Default | Effect |
+| --- | --- | --- |
+| `chunkSize: "auto"` | 256 KiB / 1 MiB / 4 MiB | Fewer round-trips on large files |
+| `concurrency` | `3` | Parallel jobs (chunks inside a job stay sequential for resume) |
+| `persistIntervalMs` / `persistEveryBytes` | `500` / `2 MiB` | Progress events every chunk; IDB writes coalesced |
+| In-memory job + blob cache | on | No `getAll()` on every progress tick |
+| Auth header cache | per attempt | `getHeaders()` once per job upload, not per chunk |
+| Image compress | OffscreenCanvas + skip-if-small | Avoids main-thread canvas when possible; skips re-encode when already within bounds |
+| Single IDB txn enqueue | on | Job + blob written together |
+| Coalesced `change` events | microtask | UI listeners aren’t flooded |
+
+Tune for flaky networks: lower `chunkSize`, set `persistEveryBytes` smaller (e.g. `256 * 1024`) so resume loses less on kill.
 
 ## How upload works
 
@@ -58,7 +76,7 @@ await media.flush(); // optional manual flush
 2. `flush()` (or auto on `online`) uploads **chunks** with:
    - `Content-Range: bytes start-end/total`
    - `X-Upload-Id`, `X-File-Name`, `X-Chunk-Start`, `X-Chunk-End`, `X-Total-Size`
-3. After each successful chunk, `bytesUploaded` is saved → **resume-safe**  
+3. Progress is durable on a coalesced schedule; **always** flushed on complete / error / pause  
 4. On the final chunk, server should return JSON `{ "url": "https://..." }` (or a raw URL string)
 
 ## Server expectations (MVP)
@@ -75,8 +93,8 @@ Your `PUT endpoint` should:
 | Method | Purpose |
 | --- | --- |
 | `enqueue(file)` | Compress (images), persist, return `MediaJob` |
-| `flush()` | Upload pending jobs |
-| `list()` | All jobs |
+| `flush()` | Upload pending jobs (parallel up to `concurrency`) |
+| `list()` | All jobs (from memory cache) |
 | `pause(id)` / `resume(id?)` | Pause one job or resume + flush |
 | `remove(id)` | Delete job + blob |
 | `on(event, fn)` | `enqueue` \| `progress` \| `complete` \| `error` \| `change` |
