@@ -1,10 +1,15 @@
 import * as esbuild from "esbuild";
+import { copyFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const workspace = join(root, "../..");
-const outfile = join(root, "../assets/demo.js");
+const assets = join(root, "../assets");
+const outfile = join(assets, "demo-stock.js");
+const legacyOutfile = join(assets, "demo.js");
+const cssSource = join(assets, "demo.css");
+const cssOut = join(assets, "demo-stock.css");
 
 const pkg = (name, file = "src/index.ts") => join(workspace, "packages", name, file);
 
@@ -45,4 +50,9 @@ await esbuild.build({
   logLevel: "info"
 });
 
+copyFileSync(outfile, legacyOutfile);
+copyFileSync(cssSource, cssOut);
+
 console.log(`Demo bundle written → ${outfile}`);
+console.log(`Legacy demo bundle written → ${legacyOutfile}`);
+console.log(`Demo CSS copied → ${cssOut}`);

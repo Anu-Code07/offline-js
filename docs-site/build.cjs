@@ -19,6 +19,7 @@ const pages = [
   ["architecture", "docs/architecture.md", "Architecture", "docs"],
   ["storage", "docs/storage-adapters.md", "Storage", "docs"],
   ["sync", "docs/sync-engine.md", "Sync", "docs"],
+  ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["contracts", "docs/public-contracts.md", "Contracts", "docs"],
   ["practices", "docs/best-practices.md", "Practices", "docs"],
@@ -36,7 +37,7 @@ function main() {
   mkdirSync(output, { recursive: true });
   cpSync(assets, join(output, "assets"), { recursive: true });
 
-  writeFileSync(join(output, "index.html"), renderHome(), "utf8");
+  writeFileSync(join(output, "index.html"), renderHome(loadBenchmarkHighlights()), "utf8");
   writeFileSync(join(output, "demo.html"), renderDemo(), "utf8");
 
   for (const [slug, source, title] of pages) {
@@ -69,14 +70,18 @@ await todos.create({ title: "Ship offline sync", completed: false });
 const open = await todos.find({ filters: { completed: false } });
 \`\`\`
 
-One package covers the common path. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need something specific? Import it from \`@offlinejs\` too, or from a focused package like \`@offlinejs/storage-sqlite\`.
+One package covers the common path: \`@offlinejs/client\`. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need a smaller bundle? Import a focused package like \`@offlinejs/storage-sqlite\`, \`@offlinejs/broadcast\`, or \`@offlinejs/sw\`.
 
 ## What happens next
 
 - Writes land in local storage immediately.
-- Mutations enter a durable queue.
+- Mutations enter a durable outbox queue.
 - Sync resumes when the network returns.
 - Conflicts resolve with your chosen strategy.
+
+## See it visually
+
+The [live demo](demo.html) uses a warehouse stock board — device → outbox → remote API — so you can watch queue flush and conflict resolution with real \`@offlinejs/devtools\` events.
 
 ## Keep exploring
 
@@ -84,6 +89,7 @@ One package covers the common path. Prefer enums like \`OfflineStorage.IndexedDB
 - [Storage Adapters](storage.html)
 - [Sync Engine](sync.html)
 - [Plugins](plugins.html)
+- [Roadmap](roadmap.html)
 `;
     }
 
@@ -167,7 +173,128 @@ function shell({ title, current, body, head = "", scripts = "" }) {
 </html>`;
 }
 
-function renderHome() {
+function loadBenchmarkHighlights() {
+  const candidates = [
+    join(assets, "benchmark-results.json"),
+    join(workspace, "docs/benchmark-results.json")
+  ];
+
+  for (const path of candidates) {
+    if (!existsSync(path)) {
+      continue;
+    }
+
+    try {
+      const report = JSON.parse(readFileSync(path, "utf8"));
+      const scores = Array.isArray(report.scores) ? report.scores : [];
+      const pick = (adapter, metric) =>
+        scores.find((score) => score.adapter === adapter && score.metric === metric);
+
+      const memoryWrites = pick("memory", "writes");
+      const memoryIndexed = pick("memory", "indexed-find");
+      const idbIndexed = pick("indexeddb", "indexed-find");
+      const sqliteIndexed = pick("sqlite", "indexed-find");
+      const datasetSize = report.adapters?.[0]?.datasetSize ?? 10_000;
+
+      return {
+        datasetSize,
+        generatedAt: report.generatedAt,
+        items: [
+          memoryWrites
+            ? {
+                label: "Memory writes",
+                value: formatOps(memoryWrites.opsPerSecond),
+                detail: "ops/s sequential set"
+              }
+            : null,
+          memoryIndexed
+            ? {
+                label: "Memory indexed find",
+                value: formatMs(memoryIndexed.durationMs),
+                detail: "equality lookup + limit 100"
+              }
+            : null,
+          idbIndexed
+            ? {
+                label: "IndexedDB indexed find",
+                value: formatMs(idbIndexed.durationMs),
+                detail: "browser durable adapter"
+              }
+            : null,
+          sqliteIndexed
+            ? {
+                label: "SQLite indexed find",
+                value: formatMs(sqliteIndexed.durationMs),
+                detail: "SQL adapter path"
+              }
+            : null
+        ].filter(Boolean)
+      };
+    } catch {
+      // Fall through to empty highlights.
+    }
+  }
+
+  return { datasetSize: 10_000, generatedAt: null, items: [] };
+}
+
+function formatOps(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+  return `${Math.round(value)}`;
+}
+
+function formatMs(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (value < 1) {
+    return `${value.toFixed(2)}ms`;
+  }
+  if (value < 10) {
+    return `${value.toFixed(1)}ms`;
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
+  const benchSection =
+    highlights.items.length === 0
+      ? ""
+      : `
+    <section class="section bench-landing" aria-label="Benchmark scores">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Benchmarks</p>
+        <h2 class="section-title reveal">Measured on real adapters.</h2>
+        <p class="section-copy reveal">
+          ${highlights.datasetSize.toLocaleString()}-record suite against memory, IndexedDB, and SQLite — not synthetic demos.
+        </p>
+        <div class="bench-strip">
+          ${highlights.items
+            .map(
+              (item, index) => `
+            <article class="bench-score reveal" style="--bench-delay: ${index * 80}ms">
+              <p class="bench-score-label">${escapeHtml(item.label)}</p>
+              <p class="bench-score-value">${escapeHtml(item.value)}</p>
+              <p class="bench-score-detail">${escapeHtml(item.detail)}</p>
+            </article>`
+            )
+            .join("")}
+        </div>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="benchmarks.html">See full scores</a>
+          <a class="button button-secondary" href="demo.html">Watch the sync pipeline</a>
+        </div>
+      </div>
+    </section>`;
+
   const body = `
     <section class="hero">
       <div class="hero-visual" aria-hidden="true">
@@ -178,21 +305,23 @@ function renderHome() {
       <div class="hero-inner">
         <h1 class="brand-hero reveal">OfflineJS</h1>
         <p class="hero-copy reveal">
-          The offline-first data layer for TypeScript apps that should keep working when the network disappears.
+          Write locally, queue mutations, sync when the link returns — one TypeScript collection API for offline-first apps.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="demo.html">Try the live demo</a>
+          <a class="button button-primary" href="demo.html">Watch the sync pipeline</a>
           <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
     </section>
 
+    ${benchSection}
+
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Why OfflineJS</p>
-        <h2 class="section-title reveal">Local writes first. Sync when ready.</h2>
+        <h2 class="section-title reveal">Device → outbox → remote.</h2>
         <p class="section-copy reveal">
-          Stop hand-rolling fetch retries, IndexedDB wrappers, mutation queues, and conflict logic. OfflineJS turns that complexity into a calm collection API.
+          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic. OfflineJS turns that into a calm collection API you can see in the live stock demo.
         </p>
         <div class="feature-strip">
           <article class="feature reveal">
@@ -200,12 +329,12 @@ function renderHome() {
             <p>UI updates immediately from durable local storage while mutations wait for reconnect.</p>
           </article>
           <article class="feature reveal">
-            <h3>Queue with backoff</h3>
-            <p>Persistent mutation queues retry with priority, pause/resume, and exponential backoff.</p>
+            <h3>Durable outbox</h3>
+            <p>Queued mutations retry with priority, pause/resume, and exponential backoff until they land remotely.</p>
           </article>
           <article class="feature reveal">
-            <h3>Pluggable everywhere</h3>
-            <p>Swap storage adapters, transports, plugins, and conflict strategies without changing your app API.</p>
+            <h3>Compose as you grow</h3>
+            <p>Start with <code>@offlinejs/client</code>, then add broadcast, service worker, SQLite, encryption, or auth packages.</p>
           </article>
         </div>
       </div>
@@ -214,18 +343,19 @@ function renderHome() {
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Install</p>
-        <h2 class="section-title reveal">Ship the first offline collection today.</h2>
-        <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
+        <h2 class="section-title reveal">One package for the common path.</h2>
+        <p class="section-copy reveal">Install <code>@offlinejs/client</code>. Prefer storage and conflict enums. Sync rides along.</p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
 
-import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: OfflineStorage.IndexedDB
+  storage: OfflineStorage.IndexedDB,
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 
-await db.collection("todos").create({ title: "Works offline" });</code></pre>
+await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
       </div>
     </section>
 
@@ -233,11 +363,11 @@ await db.collection("todos").create({ title: "Works offline" });</code></pre>
       <div class="section-inner">
         <p class="section-kicker reveal">Docs</p>
         <h2 class="section-title reveal">Explore the system.</h2>
-        <p class="section-copy reveal">Architecture, adapters, sync, plugins, contracts, and the roadmap—all in one place.</p>
+        <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, contracts, and the completed v0.2–v0.8 foundations.</p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
           <a class="button button-secondary" href="storage.html">Storage</a>
-          <a class="button button-secondary" href="sync.html">Sync</a>
+          <a class="button button-secondary" href="benchmarks.html">Benchmarks</a>
           <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>
@@ -339,8 +469,8 @@ function renderDemo() {
     title: "Live demo",
     current: "demo",
     body,
-    head: '<link rel="stylesheet" href="assets/demo.css" />',
-    scripts: '<script type="module" src="assets/demo.js"></script>'
+    head: '<link rel="stylesheet" href="assets/demo-stock.css" />',
+    scripts: '<script type="module" src="assets/demo-stock.js"></script>'
   });
 }
 

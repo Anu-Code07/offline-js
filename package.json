@@ -11,6 +11,7 @@
     "format": "prettier --check .",
     "docs:demo": "node docs-site/demo/build.mjs",
     "docs:build": "pnpm docs:demo && node docs-site/build.cjs",
+    "bench": "OFFLINEJS_WRITE_BENCH=1 vitest run packages/benchmarks/src/generate-report.test.ts --testTimeout=600000",
     "vercel-build": "test -f docs-site/out/index.html",
     "changeset": "changeset"
   },

@@ -1,0 +1,212 @@
+{
+  "generatedAt": "2026-07-20T06:53:36.500Z",
+  "node": "v22.14.0",
+  "notes": [
+    "Writes measure sequential storage.set throughput.",
+    "Find measures filtered+sorted+limited queries over the seeded dataset.",
+    "Indexed find creates a secondary index on `group`, then times equality lookup.",
+    "ops/s for find metrics uses returned row count (page size), not rows scanned."
+  ],
+  "adapters": [
+    {
+      "adapter": "memory",
+      "datasetSize": 10000,
+      "suite": {
+        "writes": {
+          "durationMs": 21.998287999999974,
+          "name": "memory:writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 454580.82919907273
+        },
+        "find": {
+          "durationMs": 4.027033000000017,
+          "name": "memory:find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 24832.177933480947
+        },
+        "indexedFind": {
+          "durationMs": 0.3677279999999996,
+          "name": "memory:indexed-find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 271940.1296610541
+        },
+        "batchWrites": {
+          "durationMs": 23.901738000000023,
+          "name": "memory:batch-writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 418379.61741526873
+        }
+      }
+    },
+    {
+      "adapter": "indexeddb",
+      "datasetSize": 10000,
+      "suite": {
+        "writes": {
+          "durationMs": 85650.805843,
+          "name": "indexeddb:writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 116.75313386228078
+        },
+        "find": {
+          "durationMs": 111.5731369999994,
+          "name": "indexeddb:find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 896.2730876698441
+        },
+        "indexedFind": {
+          "durationMs": 55.21320100000594,
+          "name": "indexeddb:indexed-find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 1811.1610663542083
+        },
+        "batchWrites": {
+          "durationMs": 124293.983443,
+          "name": "indexeddb:batch-writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 80.45441720504436
+        }
+      }
+    },
+    {
+      "adapter": "sqlite",
+      "datasetSize": 10000,
+      "suite": {
+        "writes": {
+          "durationMs": 28.172138999972958,
+          "name": "sqlite:writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 354960.62262115063
+        },
+        "find": {
+          "durationMs": 9.705816000001505,
+          "name": "sqlite:find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 10303.100738771938
+        },
+        "indexedFind": {
+          "durationMs": 4.817221999983303,
+          "name": "sqlite:indexed-find",
+          "records": 100,
+          "datasetSize": 10000,
+          "throughputPerSecond": 20758.852301253002
+        },
+        "batchWrites": {
+          "durationMs": 36.723414000007324,
+          "name": "sqlite:batch-writes",
+          "records": 10000,
+          "datasetSize": 10000,
+          "throughputPerSecond": 272305.83736027393
+        }
+      }
+    }
+  ],
+  "scores": [
+    {
+      "adapter": "memory",
+      "metric": "writes",
+      "durationMs": 22,
+      "opsPerSecond": 454581,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "memory",
+      "metric": "batch-writes",
+      "durationMs": 23.9,
+      "opsPerSecond": 418380,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "memory",
+      "metric": "find",
+      "durationMs": 4.03,
+      "opsPerSecond": 24832,
+      "records": 100,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "memory",
+      "metric": "indexed-find",
+      "durationMs": 0.37,
+      "opsPerSecond": 271940,
+      "records": 100,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "indexeddb",
+      "metric": "writes",
+      "durationMs": 85650.81,
+      "opsPerSecond": 117,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "indexeddb",
+      "metric": "batch-writes",
+      "durationMs": 124293.98,
+      "opsPerSecond": 80,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "indexeddb",
+      "metric": "find",
+      "durationMs": 111.57,
+      "opsPerSecond": 896,
+      "records": 100,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "indexeddb",
+      "metric": "indexed-find",
+      "durationMs": 55.21,
+      "opsPerSecond": 1811,
+      "records": 100,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "sqlite",
+      "metric": "writes",
+      "durationMs": 28.17,
+      "opsPerSecond": 354961,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "sqlite",
+      "metric": "batch-writes",
+      "durationMs": 36.72,
+      "opsPerSecond": 272306,
+      "records": 10000,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "sqlite",
+      "metric": "find",
+      "durationMs": 9.71,
+      "opsPerSecond": 10303,
+      "records": 100,
+      "datasetSize": 10000
+    },
+    {
+      "adapter": "sqlite",
+      "metric": "indexed-find",
+      "durationMs": 4.82,
+      "opsPerSecond": 20759,
+      "records": 100,
+      "datasetSize": 10000
+    }
+  ]
+}

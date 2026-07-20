@@ -1,7 +1,17 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { IDBFactory } from "fake-indexeddb";
 import { describe, expect, it } from "vitest";
-import { createSQLiteStorage, type SQLiteDriver } from "./index";
+import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createMemoryStorage } from "@offlinejs/storage-memory";
+import { createSQLiteStorage, type SQLiteDriver } from "@offlinejs/storage-sqlite";
+import { formatPerformanceReportMarkdown, runPerformanceReport } from "./index";
 
-const createDriver = (withTransaction = true): SQLiteDriver => {
+const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const datasetSize = Number(process.env.OFFLINEJS_BENCH_RECORDS ?? 10_000);
+
+const createMemorySqliteDriver = (): SQLiteDriver => {
   const records = new Map<string, string>();
   const indexes = new Map<string, string>();
   const entries = new Map<string, string>();
@@ -11,28 +21,23 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
       if (sql.startsWith("CREATE")) {
         return;
       }
-
       if (sql.startsWith("INSERT OR REPLACE INTO") && sql.includes("_index_entries")) {
         entries.set(`${params[0]}:${params[1]}:${params[2]}:${params[3]}`, String(params[3]));
         return;
       }
-
       if (sql.startsWith("INSERT OR REPLACE INTO") && sql.includes("_indexes")) {
         indexes.set(`${params[0]}:${params[1]}`, String(params[2]));
         return;
       }
-
       if (sql.startsWith("INSERT OR REPLACE INTO")) {
         records.set(`${params[0]}:${params[1]}`, String(params[2]));
         return;
       }
-
       if (sql.includes("_index_entries") && sql.startsWith("DELETE")) {
         if (params.length >= 4) {
           entries.delete(`${params[0]}:${params[1]}:${params[2]}:${params[3]}`);
           return;
         }
-
         if (params.length === 2) {
           for (const key of [...entries.keys()]) {
             if (key.startsWith(`${params[0]}:${params[1]}:`)) {
@@ -41,7 +46,6 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
           }
           return;
         }
-
         if (params.length === 1) {
           for (const key of [...entries.keys()]) {
             if (key.startsWith(`${params[0]}:`)) {
@@ -50,46 +54,40 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
           }
           return;
         }
-
         entries.clear();
         return;
       }
-
       if (sql.includes("_indexes") && sql.startsWith("DELETE") && params.length === 2) {
         indexes.delete(`${params[0]}:${params[1]}`);
         return;
       }
-
       if (sql.startsWith("DELETE") && params.length === 2) {
         records.delete(`${params[0]}:${params[1]}`);
         return;
       }
-
       if (sql.includes("_indexes") && sql.startsWith("DELETE") && params.length === 1) {
-        for (const key of indexes.keys()) {
+        for (const key of [...indexes.keys()]) {
           if (key.startsWith(`${params[0]}:`)) {
             indexes.delete(key);
           }
         }
         return;
       }
-
       if (sql.startsWith("DELETE") && params.length === 1) {
-        for (const key of records.keys()) {
+        for (const key of [...records.keys()]) {
           if (key.startsWith(`${params[0]}:`)) {
             records.delete(key);
           }
         }
         return;
       }
-
       if (sql.includes("_indexes") && sql.startsWith("DELETE")) {
         indexes.clear();
         return;
       }
-
       if (sql.startsWith("DELETE")) {
         records.clear();
+        entries.clear();
       }
     },
     async query(sql, params = []) {
@@ -97,26 +95,19 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
         return [...entries.keys()]
           .filter((key) => {
             const [collection, indexName, valueKey] = key.split(":");
-            return (
-              collection === params[0] &&
-              indexName === params[1] &&
-              valueKey === params[2]
-            );
+            return collection === params[0] && indexName === params[1] && valueKey === params[2];
           })
           .map((key) => ({ record_id: key.split(":").at(-1) })) as never[];
       }
-
       if (sql.includes("_indexes")) {
         return [...indexes.entries()]
           .filter(([key]) => params.length === 0 || key.startsWith(`${params[0]}:`))
           .map(([, value]) => ({ value })) as never[];
       }
-
       if (sql.includes("LIMIT 1")) {
         const value = records.get(`${params[0]}:${params[1]}`);
         return value ? ([{ value }] as never[]) : [];
       }
-
       if (sql.includes(" AND id IN (")) {
         const ids = params.slice(1).map(String);
         return ids
@@ -124,70 +115,84 @@ const createDriver = (withTransaction = true): SQLiteDriver => {
           .filter((value): value is string => value !== undefined)
           .map((value) => ({ value })) as never[];
       }
-
       return [...records.entries()]
         .filter(([key]) => key.startsWith(`${params[0]}:`))
         .map(([, value]) => ({ value })) as never[];
     },
-    ...(withTransaction ? { transaction: (run) => run() } : {})
+    transaction: (run) => run()
   };
 };
 
-describe("SQLiteStorageAdapter", () => {
-  it("stores, queries, deletes, indexes, and migrates records", async () => {
-    const storage = createSQLiteStorage({ driver: createDriver() });
+describe.skipIf(process.env.OFFLINEJS_WRITE_BENCH !== "1")("performance report generation", () => {
+  it(
+    "benchmarks real storage packages and writes docs scores",
+    async () => {
+      globalThis.indexedDB = new IDBFactory();
 
-    await storage.set("users", { id: "1", name: "Ada" });
-    await storage.set("users", { id: "2", name: "Grace" });
+      const report = await runPerformanceReport({
+        datasetSize,
+        includeBatchWrites: true,
+        adapters: [
+          { label: "memory", storage: createMemoryStorage() },
+          {
+            label: "indexeddb",
+            storage: createIndexedDBStorage({ databaseName: `bench-${Date.now()}` })
+          },
+          { label: "sqlite", storage: createSQLiteStorage({ driver: createMemorySqliteDriver() }) }
+        ]
+      });
 
-    await expect(storage.get("users", "1")).resolves.toEqual({ id: "1", name: "Ada" });
-    await expect(storage.find("users", { search: "grace" })).resolves.toEqual([
-      { id: "2", name: "Grace" }
-    ]);
+      const docsDir = join(root, "docs");
+      const assetsDir = join(root, "docs-site/assets");
+      mkdirSync(docsDir, { recursive: true });
+      mkdirSync(assetsDir, { recursive: true });
 
-    await storage.createIndex({ collection: "users", fields: ["name"], name: "users_name" });
-    await expect(storage.listIndexes("users")).resolves.toEqual([
-      { collection: "users", fields: ["name"], name: "users_name" }
-    ]);
-    await expect(storage.find("users", { filters: { name: "Grace" } })).resolves.toEqual([
-      { id: "2", name: "Grace" }
-    ]);
-    await storage.dropIndex("users", "users_name");
-    await expect(storage.listIndexes("users")).resolves.toEqual([]);
+      const markdown = `${formatPerformanceReportMarkdown(report)}
 
-    await storage.migrate([
-      {
-        name: "seed",
-        up: (store) => store.set("users", { id: "3", name: "Linus" })
-      }
-    ]);
-    await expect(storage.get("users", "3")).resolves.toMatchObject({ name: "Linus" });
+## How to reproduce
 
-    await storage.transaction(["users"], async (store) => {
-      await store.set("users", { id: "4", name: "Barbara" });
-    });
+\`\`\`bash
+pnpm bench
+# optional: OFFLINEJS_BENCH_RECORDS=50000 pnpm bench
+\`\`\`
 
-    await storage.delete("users", "1");
-    await expect(storage.get("users", "1")).resolves.toBeNull();
-  });
+This report is generated by exercising the real \`@offlinejs/storage-*\` adapters through
+\`@offlinejs/benchmarks\` (\`runPerformanceReport\`). Scores below are from this machine run.
 
-  it("lists and clears indexes across collections", async () => {
-    const storage = createSQLiteStorage({ driver: createDriver(false) });
+## What was optimized
 
-    await storage.createIndex({ collection: "users", fields: ["name"], name: "users_name" });
-    await storage.createIndex({
-      collection: "posts",
-      fields: ["title"],
-      name: "posts_title"
-    });
+Recent performance work targets hot paths the suite measures:
 
-    await expect(storage.listIndexes()).resolves.toHaveLength(2);
-    await storage.clear("users");
-    await expect(storage.listIndexes()).resolves.toEqual([
-      { collection: "posts", fields: ["title"], name: "posts_title" }
-    ]);
-    await storage.clear();
-    await expect(storage.find("users")).resolves.toEqual([]);
-    await expect(storage.listIndexes()).resolves.toEqual([]);
-  });
+- Memory finds clone only the returned page, not the full collection
+- Shared \`applyQuery\` skips redundant filter/sort copies
+- IndexedDB / SQLite indexed finds batch record hydration (no N+1 waits)
+- Queue/sync share one queue snapshot per sync pass
+- Collection \`paginate\` uses a single storage read
+`;
+
+      writeFileSync(join(docsDir, "benchmark-results.json"), `${JSON.stringify(report, null, 2)}\n`);
+      writeFileSync(
+        join(assetsDir, "benchmark-results.json"),
+        `${JSON.stringify(report, null, 2)}\n`
+      );
+      writeFileSync(join(docsDir, "benchmarks.md"), markdown);
+
+      const memoryWrites = report.scores.find(
+        (score) => score.adapter === "memory" && score.metric === "writes"
+      );
+      const memoryFind = report.scores.find(
+        (score) => score.adapter === "memory" && score.metric === "find"
+      );
+
+      expect(report.adapters.map((adapter) => adapter.adapter)).toEqual([
+        "memory",
+        "indexeddb",
+        "sqlite"
+      ]);
+      expect(memoryWrites?.opsPerSecond).toBeGreaterThan(1_000);
+      expect(memoryFind?.durationMs).toBeLessThan(250);
+      console.log(formatPerformanceReportMarkdown(report));
+    },
+    600_000
+  );
 });

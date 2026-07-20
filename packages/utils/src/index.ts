@@ -155,10 +155,17 @@ export const applyQuery = <TRecord extends EntityRecord>(
   records: TRecord[],
   query: QueryOptions<TRecord> = {}
 ): TRecord[] => {
-  const filtered = records.filter((record) => matchesQuery(record, query));
+  const needsFilter = Boolean(query.filters) || Boolean(query.search);
+  const filtered = needsFilter
+    ? records.filter((record) => matchesQuery(record, query))
+    : records;
   const sorted = sortRecords(filtered, query);
   const offset = Math.max(0, query.offset ?? 0);
-  const limit = query.limit ?? sorted.length;
+  const limit = query.limit ?? Math.max(0, sorted.length - offset);
+
+  if (offset === 0 && limit >= sorted.length) {
+    return sorted === records ? records.slice() : sorted;
+  }
 
   return sorted.slice(offset, offset + limit);
 };
@@ -224,21 +231,53 @@ export const findMatchingIndex = (
   }
 
   const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
-  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
+  let best: MatchedIndex | null = null;
 
-  for (const index of ranked) {
+  for (const index of indexes) {
     const fields = index.fields.map(String);
 
-    if (fields.every((field) => lookupByField.has(field))) {
-      return {
+    if (!fields.every((field) => lookupByField.has(field))) {
+      continue;
+    }
+
+    if (!best || fields.length > best.index.fields.length) {
+      best = {
         index,
         values: fields.map((field) => lookupByField.get(field))
       };
     }
   }
 
-  return null;
+  return best;
 };
+
+/**
+ * True when the matched index already satisfies equality filters and the query has no
+ * search/orderBy — so adapters can hydrate only the requested page of ids.
+ */
+export const indexSatisfiesQuery = <TRecord extends EntityRecord>(
+  match: MatchedIndex,
+  query?: QueryOptions<TRecord>
+): boolean => {
+  if (!query || query.search || query.orderBy) {
+    return false;
+  }
+
+  const filterKeys = query.filters ? Object.keys(query.filters) : [];
+  if (filterKeys.length === 0) {
+    return true;
+  }
+
+  const indexedFields = new Set(match.index.fields.map(String));
+  return filterKeys.every((field) => indexedFields.has(field));
+};
+
+export const queryPageWindow = (
+  query?: QueryOptions<EntityRecord>
+): { offset: number; limit?: number } => ({
+  offset: Math.max(0, query?.offset ?? 0),
+  ...(query?.limit === undefined ? {} : { limit: query.limit })
+});
 
 /** Forward index APIs through storage wrappers (validation/encryption). */
 export const withIndexForwarding = <TAdapter extends StorageAdapter>(
@@ -265,13 +304,13 @@ const sortRecords = <TRecord extends EntityRecord>(
   query: QueryOptions<TRecord>
 ): TRecord[] => {
   if (!query.orderBy) {
-    return [...records];
+    return records;
   }
 
   const direction = query.sort === "desc" ? -1 : 1;
   const key = String(query.orderBy);
 
-  return [...records].sort((left, right) => {
+  return records.slice().sort((left, right) => {
     const leftValue = left[key];
     const rightValue = right[key];
 
@@ -299,7 +338,11 @@ const matchesFilters = (
     const actual = record[field];
 
     if (Array.isArray(expected)) {
-      if (!expected.includes(actual as never)) {
+      if (expected.length > 8) {
+        if (!new Set(expected as unknown[]).has(actual)) {
+          return false;
+        }
+      } else if (!expected.includes(actual as never)) {
         return false;
       }
       continue;

@@ -7,7 +7,9 @@ import {
   benchmarkIndexedFind,
   createBenchmarkRecord,
   formatBenchmarkResult,
-  runAdapterBenchmarkSuite
+  formatPerformanceReportMarkdown,
+  runAdapterBenchmarkSuite,
+  runPerformanceReport
 } from "./index";
 
 describe("benchmarks", () => {
@@ -52,5 +54,25 @@ describe("benchmarks", () => {
     expect(suite.writes.records).toBe(6);
     expect(suite.find.name).toContain("find");
     expect(formatBenchmarkResult(suite.writes)).toContain("memory:writes");
+  });
+
+  it("builds a multi-adapter performance report from real packages", async () => {
+    const report = await runPerformanceReport({
+      datasetSize: 40,
+      includeBatchWrites: true,
+      adapters: [
+        { label: "memory", storage: createMemoryStorage() },
+        { label: "memory-b", storage: createMemoryStorage() }
+      ]
+    });
+
+    expect(report.adapters).toHaveLength(2);
+    expect(report.scores.length).toBeGreaterThan(4);
+    expect(formatPerformanceReportMarkdown(report)).toContain("| memory | writes |");
+
+    const memoryWrites = report.scores.find(
+      (score) => score.adapter === "memory" && score.metric === "writes"
+    );
+    expect(memoryWrites?.opsPerSecond).toBeGreaterThan(100);
   });
 });

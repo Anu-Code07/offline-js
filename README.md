@@ -27,10 +27,11 @@ One package for the common path:
 pnpm add @offlinejs/client
 ```
 
-Need something specialized later? Keep using `@offlinejs`, or import only that package for a smaller bundle:
+Need something specialized later? Keep importing from `@offlinejs/client`, or add only that package for a smaller bundle:
 
 ```bash
 pnpm add @offlinejs/storage-sqlite
+# or: @offlinejs/broadcast  @offlinejs/sw
 ```
 
 ## Quick start
@@ -343,12 +344,14 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 
 | Package | When to use it |
 | --- | --- |
-| `@offlinejs` | **Default.** One import for createOfflineDB, presets, React, auth, plugins, and more |
+| `@offlinejs/client` | **Default.** One import for createOfflineDB, presets, React, auth, plugins, and more |
 | `@offlinejs/core` | Internal core only, if you want the smallest custom composition |
 | `@offlinejs/storage-indexeddb` | Optional direct IndexedDB adapter import |
 | `@offlinejs/storage-memory` | Optional direct memory adapter import |
 | `@offlinejs/storage-sqlite` | Mobile, Electron, server SQLite |
 | `@offlinejs/storage-opfs` | Large browser datasets via OPFS |
+| `@offlinejs/broadcast` | Multi-tab coordination / leader election |
+| `@offlinejs/sw` | Service worker background sync helpers |
 | `@offlinejs/react` | Optional direct React hooks import |
 | `@offlinejs/next` | Next.js helpers |
 | `@offlinejs/auth` | Auth-aware transport / plugin patterns |
@@ -367,6 +370,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | [Plugins](./docs/plugins.md) | Extending OfflineJS |
 | [FAQ](./docs/faq.md) | Common consumer questions |
 | [Architecture](./docs/architecture.md) | How the pieces fit together |
+| [Benchmarks](./docs/benchmarks.md) | Measured adapter scores (`pnpm bench`) |
 
 ### Docs site
 
@@ -379,9 +383,18 @@ Static HTML is written to `docs-site/out` (committed) and mirrored to `docs-site
 
 Vercel publishes `docs-site/out` with install/build commands set to `true` (no pnpm, no compile). See [`docs-site/README.md`](./docs-site/README.md) for the exact Vercel project settings.
 
+### Benchmarks
+
+```bash
+pnpm bench
+# optional: OFFLINEJS_BENCH_RECORDS=50000 pnpm bench
+```
+
+Writes `docs/benchmarks.md` + `docs/benchmark-results.json` from real `@offlinejs/storage-*` adapters.
+
 ## Advanced package composition
 
-Still one import — pull the helpers you need from `@offlinejs`:
+Still one import — pull the helpers you need from `@offlinejs/client`:
 
 ```ts
 import {

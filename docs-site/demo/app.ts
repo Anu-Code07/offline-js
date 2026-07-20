@@ -26,28 +26,61 @@ let panel = createDevtoolsController(db, { storage });
 let unsubscribe: (() => void) | undefined;
 let eventDisposers: Array<() => void> = [];
 
-const els = {
-  onlineToggle: document.querySelector<HTMLInputElement>("#online-toggle")!,
-  onlineLabel: document.querySelector<HTMLElement>("#online-label")!,
-  linkState: document.querySelector<HTMLElement>("#link-state")!,
-  strategy: document.querySelector<HTMLSelectElement>("#conflict-strategy")!,
-  seedBtn: document.querySelector<HTMLButtonElement>("#seed-random")!,
-  syncBtn: document.querySelector<HTMLButtonElement>("#sync-now")!,
-  conflictBtn: document.querySelector<HTMLButtonElement>("#simulate-conflict")!,
-  resetBtn: document.querySelector<HTMLButtonElement>("#reset-demo")!,
-  nameInput: document.querySelector<HTMLInputElement>("#item-name")!,
-  qtyInput: document.querySelector<HTMLInputElement>("#item-qty")!,
-  addBtn: document.querySelector<HTMLButtonElement>("#add-item")!,
-  deviceList: document.querySelector<HTMLElement>("#device-list")!,
-  outboxList: document.querySelector<HTMLElement>("#outbox-list")!,
-  serverList: document.querySelector<HTMLElement>("#server-list")!,
-  deviceMeta: document.querySelector<HTMLElement>("#device-meta")!,
-  outboxMeta: document.querySelector<HTMLElement>("#outbox-meta")!,
-  serverMeta: document.querySelector<HTMLElement>("#server-meta")!,
-  status: document.querySelector<HTMLElement>("#demo-status")!,
-  flow: document.querySelector<HTMLElement>("#sync-flow")!,
-  devtools: document.querySelector<HTMLElement>("#offlinejs-devtools")!
+type DemoElements = {
+  onlineToggle: HTMLInputElement;
+  onlineLabel: HTMLElement;
+  linkState: HTMLElement;
+  strategy: HTMLSelectElement;
+  seedBtn: HTMLButtonElement;
+  syncBtn: HTMLButtonElement;
+  conflictBtn: HTMLButtonElement;
+  resetBtn: HTMLButtonElement;
+  nameInput: HTMLInputElement;
+  qtyInput: HTMLInputElement;
+  addBtn: HTMLButtonElement;
+  deviceList: HTMLElement;
+  outboxList: HTMLElement;
+  serverList: HTMLElement;
+  deviceMeta: HTMLElement;
+  outboxMeta: HTMLElement;
+  serverMeta: HTMLElement;
+  status: HTMLElement;
+  flow: HTMLElement;
+  devtools: HTMLElement;
 };
+
+let els: DemoElements;
+
+const requireEl = <T extends Element>(selector: string): T => {
+  const element = document.querySelector<T>(selector);
+  if (!element) {
+    throw new Error(`Demo UI missing required element: ${selector}`);
+  }
+  return element;
+};
+
+const bindElements = (): DemoElements => ({
+  onlineToggle: requireEl<HTMLInputElement>("#online-toggle"),
+  onlineLabel: requireEl<HTMLElement>("#online-label"),
+  linkState: requireEl<HTMLElement>("#link-state"),
+  strategy: requireEl<HTMLSelectElement>("#conflict-strategy"),
+  seedBtn: requireEl<HTMLButtonElement>("#seed-random"),
+  syncBtn: requireEl<HTMLButtonElement>("#sync-now"),
+  conflictBtn: requireEl<HTMLButtonElement>("#simulate-conflict"),
+  resetBtn: requireEl<HTMLButtonElement>("#reset-demo"),
+  nameInput: requireEl<HTMLInputElement>("#item-name"),
+  qtyInput: requireEl<HTMLInputElement>("#item-qty"),
+  addBtn: requireEl<HTMLButtonElement>("#add-item"),
+  deviceList: requireEl<HTMLElement>("#device-list"),
+  outboxList: requireEl<HTMLElement>("#outbox-list"),
+  serverList: requireEl<HTMLElement>("#server-list"),
+  deviceMeta: requireEl<HTMLElement>("#device-meta"),
+  outboxMeta: requireEl<HTMLElement>("#outbox-meta"),
+  serverMeta: requireEl<HTMLElement>("#server-meta"),
+  status: requireEl<HTMLElement>("#demo-status"),
+  flow: requireEl<HTMLElement>("#sync-flow"),
+  devtools: requireEl<HTMLElement>("#offlinejs-devtools")
+});
 
 function createDemoDb(): DemoDb {
   return createOfflineDB<{ stock: StockItem }>({
@@ -64,6 +97,13 @@ function createDemoDb(): DemoDb {
 }
 
 async function boot(): Promise<void> {
+  if (document.readyState === "loading") {
+    await new Promise<void>((resolve) => {
+      document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+  }
+
+  els = bindElements();
   panel.mount(els.devtools);
   wireControls();
   wireEvents();
@@ -448,7 +488,10 @@ function labelForState(state: string): string {
 }
 
 function setStatus(message: string): void {
-  els.status.textContent = message;
+  const status = els?.status ?? document.querySelector<HTMLElement>("#demo-status");
+  if (status) {
+    status.textContent = message;
+  }
 }
 
 function escapeHtml(value: string): string {
@@ -461,5 +504,13 @@ function escapeHtml(value: string): string {
 
 void boot().catch((error) => {
   console.error(error);
-  setStatus(error instanceof Error ? error.message : "Demo failed to start");
+  const message = error instanceof Error ? error.message : "Demo failed to start";
+  try {
+    setStatus(message);
+  } catch {
+    const fallback = document.querySelector<HTMLElement>("#demo-status");
+    if (fallback) {
+      fallback.textContent = message;
+    }
+  }
 });
