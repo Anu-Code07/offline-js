@@ -1993,28 +1993,36 @@ var db = createDemoDb();
 var panel = createDevtoolsController(db);
 var unsubscribe;
 var eventDisposers = [];
-var els = {
-  onlineToggle: document.querySelector("#online-toggle"),
-  onlineLabel: document.querySelector("#online-label"),
-  linkState: document.querySelector("#link-state"),
-  strategy: document.querySelector("#conflict-strategy"),
-  seedBtn: document.querySelector("#seed-random"),
-  syncBtn: document.querySelector("#sync-now"),
-  conflictBtn: document.querySelector("#simulate-conflict"),
-  resetBtn: document.querySelector("#reset-demo"),
-  nameInput: document.querySelector("#item-name"),
-  qtyInput: document.querySelector("#item-qty"),
-  addBtn: document.querySelector("#add-item"),
-  deviceList: document.querySelector("#device-list"),
-  outboxList: document.querySelector("#outbox-list"),
-  serverList: document.querySelector("#server-list"),
-  deviceMeta: document.querySelector("#device-meta"),
-  outboxMeta: document.querySelector("#outbox-meta"),
-  serverMeta: document.querySelector("#server-meta"),
-  status: document.querySelector("#demo-status"),
-  flow: document.querySelector("#sync-flow"),
-  devtools: document.querySelector("#offlinejs-devtools")
+var els;
+var requireEl = (selector) => {
+  const element = document.querySelector(selector);
+  if (!element) {
+    throw new Error(`Demo UI missing required element: ${selector}`);
+  }
+  return element;
 };
+var bindElements = () => ({
+  onlineToggle: requireEl("#online-toggle"),
+  onlineLabel: requireEl("#online-label"),
+  linkState: requireEl("#link-state"),
+  strategy: requireEl("#conflict-strategy"),
+  seedBtn: requireEl("#seed-random"),
+  syncBtn: requireEl("#sync-now"),
+  conflictBtn: requireEl("#simulate-conflict"),
+  resetBtn: requireEl("#reset-demo"),
+  nameInput: requireEl("#item-name"),
+  qtyInput: requireEl("#item-qty"),
+  addBtn: requireEl("#add-item"),
+  deviceList: requireEl("#device-list"),
+  outboxList: requireEl("#outbox-list"),
+  serverList: requireEl("#server-list"),
+  deviceMeta: requireEl("#device-meta"),
+  outboxMeta: requireEl("#outbox-meta"),
+  serverMeta: requireEl("#server-meta"),
+  status: requireEl("#demo-status"),
+  flow: requireEl("#sync-flow"),
+  devtools: requireEl("#offlinejs-devtools")
+});
 function createDemoDb() {
   return createOfflineDB2({
     storage,
@@ -2029,6 +2037,12 @@ function createDemoDb() {
   });
 }
 async function boot() {
+  if (document.readyState === "loading") {
+    await new Promise((resolve) => {
+      document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
+    });
+  }
+  els = bindElements();
   panel.mount(els.devtools);
   wireControls();
   wireEvents();
@@ -2330,12 +2344,23 @@ function labelForState(state) {
   }
 }
 function setStatus(message) {
-  els.status.textContent = message;
+  const status = els?.status ?? document.querySelector("#demo-status");
+  if (status) {
+    status.textContent = message;
+  }
 }
 function escapeHtml2(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 void boot().catch((error) => {
   console.error(error);
-  setStatus(error instanceof Error ? error.message : "Demo failed to start");
+  const message = error instanceof Error ? error.message : "Demo failed to start";
+  try {
+    setStatus(message);
+  } catch {
+    const fallback = document.querySelector("#demo-status");
+    if (fallback) {
+      fallback.textContent = message;
+    }
+  }
 });

@@ -93,14 +93,10 @@ var matchesQuery = (record, query = {}) => {
   );
 };
 var applyQuery = (records, query = {}) => {
-  const needsFilter = Boolean(query.filters) || Boolean(query.search);
-  const filtered = needsFilter ? records.filter((record) => matchesQuery(record, query)) : records;
+  const filtered = records.filter((record) => matchesQuery(record, query));
   const sorted = sortRecords(filtered, query);
   const offset = Math.max(0, query.offset ?? 0);
-  const limit = query.limit ?? Math.max(0, sorted.length - offset);
-  if (offset === 0 && limit >= sorted.length) {
-    return sorted === records ? records.slice() : sorted;
-  }
+  const limit = query.limit ?? sorted.length;
   return sorted.slice(offset, offset + limit);
 };
 var countQuery = (records, query = {}) => records.filter((record) => matchesQuery(record, query)).length;
@@ -130,43 +126,25 @@ var findMatchingIndex = (indexes, lookups) => {
     return null;
   }
   const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
-  let best = null;
-  for (const index of indexes) {
+  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
+  for (const index of ranked) {
     const fields = index.fields.map(String);
-    if (!fields.every((field) => lookupByField.has(field))) {
-      continue;
-    }
-    if (!best || fields.length > best.index.fields.length) {
-      best = {
+    if (fields.every((field) => lookupByField.has(field))) {
+      return {
         index,
         values: fields.map((field) => lookupByField.get(field))
       };
     }
   }
-  return best;
+  return null;
 };
-var indexSatisfiesQuery = (match, query) => {
-  if (!query || query.search || query.orderBy) {
-    return false;
-  }
-  const filterKeys = query.filters ? Object.keys(query.filters) : [];
-  if (filterKeys.length === 0) {
-    return true;
-  }
-  const indexedFields = new Set(match.index.fields.map(String));
-  return filterKeys.every((field) => indexedFields.has(field));
-};
-var queryPageWindow = (query) => ({
-  offset: Math.max(0, query?.offset ?? 0),
-  ...query?.limit === void 0 ? {} : { limit: query.limit }
-});
 var sortRecords = (records, query) => {
   if (!query.orderBy) {
-    return records;
+    return [...records];
   }
   const direction = query.sort === "desc" ? -1 : 1;
   const key = String(query.orderBy);
-  return records.slice().sort((left, right) => {
+  return [...records].sort((left, right) => {
     const leftValue = left[key];
     const rightValue = right[key];
     if (leftValue === rightValue) {
@@ -185,11 +163,7 @@ var matchesFilters = (record, filters) => {
   for (const [field, expected] of Object.entries(filters)) {
     const actual = record[field];
     if (Array.isArray(expected)) {
-      if (expected.length > 8) {
-        if (!new Set(expected).has(actual)) {
-          return false;
-        }
-      } else if (!expected.includes(actual)) {
+      if (!expected.includes(actual)) {
         return false;
       }
       continue;
@@ -412,34 +386,15 @@ var MutationQueue = class {
     if (this.paused) {
       return [];
     }
-    return this.selectDue(await this.all(), options);
-  }
-  /** Filter an already-loaded queue snapshot without an extra storage read. */
-  selectDue(mutations, options = defaultQueueProcessingOptions) {
-    if (this.paused) {
-      return [];
-    }
     const timestamp = now();
-    const due = [];
-    for (const mutation of mutations) {
-      if (mutation.status === "processing") {
-        continue;
+    const mutations = await this.all();
+    return mutations.filter((mutation) => mutation.status !== "processing").filter((mutation) => mutation.retries < options.retry.maxAttempts).filter((mutation) => {
+      if (!mutation.lastAttemptAt) {
+        return true;
       }
-      if (mutation.retries >= options.retry.maxAttempts) {
-        continue;
-      }
-      if (mutation.lastAttemptAt) {
-        const delay2 = backoffDelay(mutation.retries, options.retry);
-        if (mutation.lastAttemptAt + delay2 > timestamp) {
-          continue;
-        }
-      }
-      due.push(mutation);
-      if (due.length >= options.batchSize) {
-        break;
-      }
-    }
-    return due;
+      const delay2 = backoffDelay(mutation.retries, options.retry);
+      return mutation.lastAttemptAt + delay2 <= timestamp;
+    }).slice(0, options.batchSize);
   }
   async remove(id) {
     await this.storage.delete(this.collectionName, id);
@@ -515,11 +470,8 @@ var MemoryStorageAdapter = class {
   }
   async find(collection, query) {
     const indexed = this.findViaIndex(collection, query);
-    if (indexed?.complete) {
-      return indexed.records.map((record) => clone(record));
-    }
-    const records = indexed?.records ?? [...this.records.get(collection)?.values() ?? []];
-    return applyQuery(records, query).map((record) => clone(record));
+    const records = indexed ?? [...this.records.get(collection)?.values() ?? []].map((record) => clone(record));
+    return applyQuery(records, query);
   }
   async clear(collection) {
     if (collection) {
@@ -621,22 +573,16 @@ var MemoryStorageAdapter = class {
     const valueKey = serializeCompoundIndexValue(match.values);
     const ids = this.secondary.get(collection)?.get(match.index.name)?.get(valueKey);
     if (!ids) {
-      return { complete: indexSatisfiesQuery(match, query), records: [] };
-    }
-    let idList = [...ids];
-    const complete = indexSatisfiesQuery(match, query);
-    if (complete) {
-      const { offset, limit } = queryPageWindow(query);
-      idList = limit === void 0 ? idList.slice(offset) : idList.slice(offset, offset + limit);
+      return [];
     }
     const records = [];
-    for (const id of idList) {
+    for (const id of ids) {
       const record = this.records.get(collection)?.get(id);
       if (record) {
-        records.push(record);
+        records.push(clone(record));
       }
     }
-    return { complete, records };
+    return records;
   }
   assertUniqueIndexes(collection, record, ignoreId) {
     for (const definition of this.indexes.get(collection)?.values() ?? []) {
@@ -725,11 +671,10 @@ var SyncEngine = class {
       return { completed: 0, failed: 0 };
     }
     this.running = true;
-    const options = this.processingOptions();
     const queued = await this.queue.all();
     this.events.emit("sync:start", { mode: "full", queued: queued.length });
     try {
-      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection, queued, options);
+      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection);
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
       }
@@ -756,9 +701,11 @@ var SyncEngine = class {
     });
     return records;
   }
-  async push(collection, queued, options = this.processingOptions()) {
-    const mutations = queued ?? await this.queue.all();
-    const due = this.queue.selectDue(mutations, options).filter((mutation) => !collection || mutation.collection === collection);
+  async push(collection) {
+    const options = this.processingOptions();
+    const due = (await this.queue.due(options)).filter(
+      (mutation) => !collection || mutation.collection === collection
+    );
     let completed = 0;
     let failed = 0;
     for (const mutation of due) {
@@ -1081,8 +1028,10 @@ var OfflineDataCollection = class {
     }
   }
   async paginate(query = {}) {
-    const allRecords = await this.storage.find(this.name);
-    const data = applyQuery(allRecords, query);
+    const [data, allRecords] = await Promise.all([
+      this.find(query),
+      this.storage.find(this.name)
+    ]);
     return {
       data,
       limit: query.limit ?? data.length,
@@ -1192,10 +1141,7 @@ var IndexedDBStorageAdapter = class {
   }
   async find(collection, query) {
     const indexed = await this.findViaIndex(collection, query);
-    if (indexed?.complete) {
-      return indexed.records;
-    }
-    const records = indexed?.records ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
+    const records = indexed ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
     return applyQuery(records, query);
   }
   async clear(collection) {
@@ -1243,7 +1189,7 @@ var IndexedDBStorageAdapter = class {
     const rows = await this.request(
       this.indexStore("readonly").getAll()
     );
-    return rows.filter((row) => !collection || row.collection === collection || row.id.startsWith(`${collection}:`)).map((row) => {
+    return rows.filter((row) => !collection || row.collection === collection).map((row) => {
       const definition = { ...row };
       delete definition.id;
       return clone(definition);
@@ -1277,27 +1223,17 @@ var IndexedDBStorageAdapter = class {
       match.index.name,
       serializeCompoundIndexValue(match.values)
     );
-    let entries = await this.request(this.entryLookup("readonly").getAll(lookup));
-    const complete = indexSatisfiesQuery(match, query);
-    if (complete) {
-      const { offset, limit } = queryPageWindow(query);
-      entries = limit === void 0 ? entries.slice(offset) : entries.slice(offset, offset + limit);
-    }
-    if (entries.length === 0) {
-      return { complete, records: [] };
-    }
-    const database = await this.database();
-    const transaction = database.transaction(STORE_NAME, "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const rows = await Promise.all(
-      entries.map(
-        (entry) => this.request(store.get(this.key(collection, entry.recordId)))
-      )
+    const entries = await this.request(
+      this.entryLookup("readonly").getAll(lookup)
     );
-    return {
-      complete,
-      records: rows.filter((row) => Boolean(row)).map((row) => clone(row.value))
-    };
+    const records = [];
+    for (const entry of entries) {
+      const record = await this.get(collection, entry.recordId);
+      if (record) {
+        records.push(record);
+      }
+    }
+    return records;
   }
   async assertUniqueIndexes(collection, record, ignoreId) {
     for (const definition of await this.listIndexes(collection)) {
@@ -1349,10 +1285,8 @@ var IndexedDBStorageAdapter = class {
     return this.request(index.getAll(collection));
   }
   async getEntriesForCollection(collection) {
-    const database = await this.database();
-    const transaction = database.transaction(INDEX_ENTRIES_STORE, "readonly");
-    const index = transaction.objectStore(INDEX_ENTRIES_STORE).index(COLLECTION_INDEX);
-    return this.request(index.getAll(collection));
+    const all = await this.request(this.entryStore("readonly").getAll());
+    return all.filter((entry) => entry.collection === collection);
   }
   store(mode) {
     return this.objectStoreProxy(STORE_NAME, mode);
