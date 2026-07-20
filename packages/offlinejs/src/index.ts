@@ -173,7 +173,7 @@ export {
   createIndexedDBHttpCache,
   createMemoryHttpCache,
   invalidateCacheKey
-} from "@offlinejs/cache";
+} from "@offlinejs/http-cache";
 export type {
   CacheEntry,
   CachePolicy,
@@ -181,7 +181,7 @@ export type {
   CachedResult,
   HttpCacheStore,
   IndexedDBHttpCacheOptions
-} from "@offlinejs/cache";
+} from "@offlinejs/http-cache";
 
 // Plugins & advanced
 export {

@@ -33,7 +33,7 @@ const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
 | Need | Tool |
 | --- | --- |
 | Offline writes + sync + conflicts | `createOfflineDB` |
-| Cache GET/JSON responses with TTL | `cachedJson` / `cachedFetch` (`@offlinejs/cache`) |
+| Cache GET/JSON responses with TTL | `cachedJson` / `cachedFetch` (`@offlinejs/http-cache`) |
 | Cache static assets (JS/CSS/images) | Service Worker + Cache API (`createCacheApiStore`) |
 
 ## Which package should I install?

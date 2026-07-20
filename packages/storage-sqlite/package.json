@@ -1,6 +1,6 @@
 {
   "name": "@offlinejs/storage-sqlite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SQLite storage adapter for OfflineJS using a pluggable async driver.",
   "type": "module",
   "sideEffects": false,
