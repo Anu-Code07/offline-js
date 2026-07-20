@@ -32,18 +32,35 @@
       </aside>
       <article class="content reveal">
         <h1>HTTP cache (<code>@offlinejs/http-cache</code>)</h1><p>General-purpose <strong>read-through</strong> cache for GET/JSON (and optional Cache API for assets).</p><p>This is <strong>not</strong> the offline mutation queue. Use <code>createOfflineDB</code> when users must write offline and sync later. Use this package when you want faster / offline-*readable* HTTP responses with TTL.</p><h2>Install</h2><p>Already included with <a href="https://www.npmjs.com/package/@offlinejs/client"><code>@offlinejs/client</code></a> <strong>0.1.2+</strong>, or install the focused package:</p><pre><code>pnpm add @offlinejs/http-cache
-# npm i @offlinejs/http-cache</code></pre><p><a href="https://www.npmjs.com/package/@offlinejs/http-cache"><code>@offlinejs/http-cache</code> on npm</a>
-<h2>Quick start</h2><pre><code>import { cachedJson, createIndexedDBHttpCache } from &quot;@offlinejs/client&quot;;
+# npm i @offlinejs/http-cache</code></pre><p><a href="https://www.npmjs.com/package/@offlinejs/http-cache"><code>@offlinejs/http-cache</code> on npm</a></p><h2>How to use <code>cachedJson</code></h2><p>Signature (same shape as <code>fetch</code>, plus cache options):</p><pre><code>cachedJson&lt;T&gt;(url, init?, cacheOptions?) → Promise&lt;CachedResult&lt;T&gt;&gt;</code></pre><div class="table-wrap"><table class="data-table"><thead><tr><th>Argument</th><th>Type</th><th>Purpose</th></tr></thead><tbody><tr><td><code>url</code></td><td><code>string</code> \</td><td><code>URL</code> \</td><td><code>Request</code></td><td>What to fetch (required)</td></tr><tr><td><code>init</code></td><td><code>RequestInit</code> \</td><td><code>undefined</code></td><td>Normal fetch options: <code>headers</code>, <code>method</code>, <code>signal</code>, etc. Pass <strong><code>undefined</code></strong> when you don’t need any.</td></tr><tr><td><code>cacheOptions</code></td><td>object</td><td>Cache behavior: <code>store</code>, <code>ttlMs</code>, <code>staleWhileRevalidateMs</code>, <code>key</code>, …</td></tr></tbody></table></div><h3>Why <code>undefined</code>?</h3><pre><code>await cachedJson(&quot;/api/items&quot;, undefined, { store, ttlMs: 60_000 });
+//                         ^^^^^^^^^
+//                         no fetch headers/method — just a GET</code></pre><p>The second slot is reserved for fetch <code>init</code>. Cache settings go in the <strong>third</strong> argument. If you skip <code>undefined</code> and put the cache object second, it would be treated as fetch options (wrong).</p><h3>With auth headers</h3><pre><code>await cachedJson(&quot;/api/items&quot;, {
+  headers: { Authorization: `Bearer ${token}` }
+}, {
+  store,
+  ttlMs: 60_000
+});</code></pre><h3>What you get back</h3><pre><code>type CachedResult&lt;T&gt; = {
+  data: T;           // parsed JSON body
+  fromCache: boolean; // true if served from cache
+  stale: boolean;     // true if TTL expired but still within SWR window
+  status: number;
+  headers: Record&lt;string, string&gt;;
+  key: string;        // cache key, default &quot;GET &lt;url&gt;&quot;
+};</code></pre><h2>Quick start</h2><pre><code>import { cachedJson, createIndexedDBHttpCache } from &quot;@offlinejs/client&quot;;
 
 const store = createIndexedDBHttpCache({ databaseName: &quot;my-http-cache&quot; });
 
-const result = await cachedJson&lt;{ items: string[] }&gt;(&quot;/api/items&quot;, undefined, {
-  store,
-  ttlMs: 60_000, // fresh for 1 minute
-  staleWhileRevalidateMs: 120_000 // serve stale up to 2 more minutes while refreshing
-});
+const result = await cachedJson&lt;{ items: string[] }&gt;(
+  &quot;/api/items&quot;,
+  undefined, // no RequestInit — plain GET
+  {
+    store,
+    ttlMs: 60_000, // fresh for 1 minute
+    staleWhileRevalidateMs: 120_000 // serve stale up to 2 more minutes while refreshing
+  }
+);
 
-console.log(result.data, result.fromCache, result.stale);</code></pre><h2>Stores</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Helper</th><th>Persistence</th><th>Best for</th></tr></thead><tbody><tr><td><code>createMemoryHttpCache()</code></td><td>Tab memory</td><td>Tests, short-lived UI</td></tr><tr><td><code>createIndexedDBHttpCache()</code></td><td>IndexedDB</td><td>Durable API response cache</td></tr><tr><td><code>createCacheApiStore()</code></td><td>Cache API</td><td>Raw <code>Response</code> / asset caching in SW-friendly apps</td></tr></tbody></table></div><h2>Invalidate</h2><pre><code>import { clearHttpCache, invalidateCacheKey } from &quot;@offlinejs/client&quot;;
+console.log(result.data, result.fromCache, result.stale);</code></pre><h2>Options</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Option</th><th>Default</th><th>Meaning</th></tr></thead><tbody><tr><td><code>store</code></td><td>in-memory</td><td>Where entries live (<code>createMemoryHttpCache</code>, <code>createIndexedDBHttpCache</code>, …)</td></tr><tr><td><code>ttlMs</code></td><td><code>60_000</code></td><td>Fresh window — serve from cache, no network</td></tr><tr><td><code>staleWhileRevalidateMs</code></td><td><code>0</code></td><td>Extra time after TTL to return stale data while a background refresh runs</td></tr><tr><td><code>key</code></td><td><code>&quot;GET &lt;url&gt;&quot;</code></td><td>Override cache key</td></tr><tr><td><code>methods</code></td><td><code>GET</code>, <code>HEAD</code></td><td>Only these methods are cached</td></tr><tr><td><code>fetch</code></td><td><code>globalThis.fetch</code></td><td>Inject a custom fetch (tests, polyfills)</td></tr></tbody></table></div><h2>Stores</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Helper</th><th>Persistence</th><th>Best for</th></tr></thead><tbody><tr><td><code>createMemoryHttpCache()</code></td><td>Tab memory</td><td>Tests, short-lived UI</td></tr><tr><td><code>createIndexedDBHttpCache()</code></td><td>IndexedDB</td><td>Durable API response cache</td></tr><tr><td><code>createCacheApiStore()</code></td><td>Cache API</td><td>Raw <code>Response</code> / asset caching in SW-friendly apps</td></tr></tbody></table></div><h2>Invalidate</h2><pre><code>import { clearHttpCache, invalidateCacheKey } from &quot;@offlinejs/client&quot;;
 
 await invalidateCacheKey(&quot;GET /api/items&quot;, store);
 await clearHttpCache(store);</code></pre><h2>With OfflineJS together</h2><p>Typical pattern:</p><p>1. <strong>Cache</strong> catalog / reference GETs with <code>cachedJson</code> (TTL)  

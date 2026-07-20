@@ -23,13 +23,14 @@ That is **offline-first product data** (stock counts, checklists, CRM rows, form
 import { cachedJson, createIndexedDBHttpCache } from "@offlinejs/client";
 
 const store = createIndexedDBHttpCache();
+
+// 2nd arg = fetch init (undefined = plain GET); 3rd arg = cache options
 const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
   store,
   ttlMs: 60_000,
   staleWhileRevalidateMs: 30_000
 });
 ```
-
 | Need | Tool |
 | --- | --- |
 | Offline writes + sync + conflicts | `createOfflineDB` |
