@@ -6,17 +6,20 @@
 pnpm add @offlinejs/client
 ```
 
+One package covers the common path. Prefer enums (`OfflineStorage`, `ConflictStrategyName`) over raw strings. Import a focused `@offlinejs/*` package only when you need a smaller bundle.
+
 ## `createOfflineDB(options)`
 
-Creates a framework-agnostic offline database from the one-import package.
+Creates a framework-agnostic offline database.
 
 ```ts
 import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS
-  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
+  storage: OfflineStorage.IndexedDB, // Memory | IndexedDB | OPFS
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins },
+  plugins: [] // see Plugins below
 });
 ```
 
@@ -27,21 +30,28 @@ If `storage` is omitted, OfflineJS picks `OfflineStorage.IndexedDB` in browsers 
 | `OfflineStorage` | `Memory`, `IndexedDB`, `OPFS` |
 | `ConflictStrategyName` | `ClientWins`, `ServerWins`, `LastWriteWins`, `Merge` |
 
-Need a specialized helper? Import it from the same package:
+Common options:
+
+| Option | Purpose |
+| --- | --- |
+| `baseURL` | Prefix for default fetch transport |
+| `storage` | Adapter instance or `OfflineStorage` preset |
+| `network` | Online/offline monitor (defaults to browser monitor) |
+| `transport` | Custom `SyncTransport` (push/pull HTTP or fake API) |
+| `sync` | Auto-start, pull, conflict strategy, batching |
+| `plugins` | Array of `OfflinePlugin` factories (devtools, auth, …) |
+
+Need a specialized helper from the same package:
 
 ```ts
 import {
   createOfflineDB,
   createAuthTransport,
   createSQLiteStorage,
-  useOfflineCollection
+  useOfflineCollection,
+  devtools,
+  validationPlugin
 } from "@offlinejs/client";
-```
-
-Or import only that package when you want a smaller bundle:
-
-```ts
-import { createSQLiteStorage } from "@offlinejs/storage-sqlite";
 ```
 
 ## Collections
@@ -58,13 +68,188 @@ await users.sync();
 const unsubscribe = users.subscribe((records) => {});
 ```
 
+Writes land in local storage immediately and enqueue a durable outbox mutation. Call `db.sync()` (or rely on auto-sync) to flush when online.
+
 ## Events
 
-Available events are `sync:start`, `sync:end`, `offline`, `online`, `queue:add`,
-`queue:complete`, `conflict`, and `error`.
+| Event | When it fires |
+| --- | --- |
+| `sync:start` / `sync:end` | Sync cycle begins / finishes |
+| `offline` / `online` | Network monitor changes |
+| `queue:add` / `queue:complete` | Mutation enters / leaves the outbox |
+| `conflict` | Client and server versions diverge |
+| `error` | Transport, validation, or storage failure |
+| `worker:message` | Service worker / worker-sync message |
+| `coordination:message` | Multi-tab broadcast coordination |
 
 ```ts
 db.on("queue:add", (mutation) => {
   console.debug("queued", mutation);
 });
 ```
+
+## Plugins (what ships today)
+
+Plugins add behavior without forking core. Pass them to `createOfflineDB({ plugins: [...] })` or call `db.use(plugin)` later.
+
+Each plugin gets `{ db, events, network, storage }` in `setup` and may return a disposer.
+
+### Built-in plugins & helpers
+
+| Export | Package | What it does |
+| --- | --- | --- |
+| `devtools({ ui? })` | `@offlinejs/devtools` | Logs OfflineJS events; set `ui: true` to open a floating Action/State dock |
+| `openOfflineDevtools(db)` / `createDevtoolsController(db)` | `@offlinejs/devtools-ui` | Redux-style panel — floating dock or inline `mount(el)` |
+| `authPlugin` / `createAuthTransport` | `@offlinejs/auth` | Attaches Bearer (or custom) tokens; optional refresh on 401 |
+| `validationPlugin` / `createValidatedStorage` | `@offlinejs/validation` | Schema checks on write (`createRequiredFieldsValidator`, `createTypeValidator`, …) |
+| `createJsonEncryptionStorage` | `@offlinejs/encryption` | AES-GCM encrypt/decrypt records at rest (Web Crypto) |
+| `coordinationPlugin` / `createBroadcastCoordination` | `@offlinejs/broadcast` | Multi-tab leader election + sync debounce via `BroadcastChannel` |
+| `backgroundSyncPlugin` / `registerOfflineServiceWorker` | `@offlinejs/sw` | Request Background Sync / SW messages when the link returns |
+| `createWorkerSyncPlugin` | `@offlinejs/worker-sync` | Move sync work into a Web Worker |
+
+### DevTools (most common)
+
+```ts
+import { createOfflineDB, OfflineStorage, devtools, openOfflineDevtools } from "@offlinejs/client";
+
+const db = createOfflineDB({
+  storage: OfflineStorage.IndexedDB,
+  plugins: [devtools({ ui: true })] // console + floating dock
+});
+
+// or open manually later:
+openOfflineDevtools(db, { position: "bottom" });
+// Ctrl/⌘ + Shift + O toggles the dock
+```
+
+Inline panel (docs / embeds — used by the live demo):
+
+```ts
+import { createDevtoolsController, devtools } from "@offlinejs/client";
+
+const db = createOfflineDB({ plugins: [devtools()] });
+const panel = createDevtoolsController(db);
+panel.mount(document.getElementById("offlinejs-devtools"));
+```
+
+The panel shows a live **Action** log (`queue:*`, `sync:*`, network, conflicts, errors), filter chips + search, pause/clear, and a **State / Outbox** tab.
+
+### Auth
+
+```ts
+import { createAuthTransport, createFetchTransport, authPlugin } from "@offlinejs/client";
+
+const transport = createAuthTransport(createFetchTransport({ baseURL: "/api" }), {
+  tokenProvider: () => localStorage.getItem("token"),
+  refreshToken: async () => fetchNewToken(),
+  retryOnUnauthorized: true
+});
+
+const db = createOfflineDB({
+  transport,
+  plugins: [authPlugin({ tokenProvider: () => localStorage.getItem("token") })]
+});
+```
+
+### Validation
+
+```ts
+import {
+  createOfflineDB,
+  createRequiredFieldsValidator,
+  createTypeValidator,
+  validationPlugin
+} from "@offlinejs/client";
+
+const db = createOfflineDB({
+  plugins: [
+    validationPlugin({
+      stock: createRequiredFieldsValidator(["name", "qty"]),
+      // or composeValidators(createRequiredFieldsValidator([...]), createTypeValidator({ qty: "number" }))
+    })
+  ]
+});
+```
+
+### Encryption at rest
+
+```ts
+import {
+  createIndexedDBStorage,
+  createJsonEncryptionStorage,
+  createWebCryptoAesGcmCodec,
+  generateAesGcmKey,
+  createOfflineDB
+} from "@offlinejs/client";
+
+const key = await generateAesGcmKey();
+const codec = await createWebCryptoAesGcmCodec(key);
+const storage = createJsonEncryptionStorage(createIndexedDBStorage(), codec);
+const db = createOfflineDB({ storage });
+```
+
+### Multi-tab coordination
+
+```ts
+import { coordinationPlugin, createOfflineDB } from "@offlinejs/client";
+
+const db = createOfflineDB({
+  plugins: [coordinationPlugin({ channelName: "my-app-offline", syncDebounceMs: 250 })]
+});
+```
+
+### Background sync (service worker)
+
+```ts
+import {
+  backgroundSyncPlugin,
+  registerOfflineServiceWorker,
+  createOfflineDB
+} from "@offlinejs/client";
+
+await registerOfflineServiceWorker({ scriptUrl: "/sw.js" });
+const db = createOfflineDB({
+  plugins: [backgroundSyncPlugin({ syncTag: "offlinejs-sync" })]
+});
+```
+
+### Custom plugin shape
+
+```ts
+const analytics = () => ({
+  name: "analytics",
+  setup({ events }) {
+    return events.on("sync:end", (result) => {
+      sendMetric("offlinejs.sync", result);
+    });
+  }
+});
+
+db.use(analytics());
+```
+
+See [Plugins](plugins.html) for the full guide and [AI.md](ai.html) for copy-paste implementation prompts aimed at AI editors.
+
+## React
+
+```ts
+import { OfflineProvider, useOfflineCollection, useOfflineStatus } from "@offlinejs/client";
+```
+
+Wrap your tree in `OfflineProvider` with a `db` instance, then use `useOfflineCollection("todos")` and `useOfflineStatus()` in components.
+
+## Storage adapters
+
+| Adapter | Import | Notes |
+| --- | --- | --- |
+| Memory | `OfflineStorage.Memory` / `createMemoryStorage()` | Fast, non-durable — tests & SSR |
+| IndexedDB | `OfflineStorage.IndexedDB` / `createIndexedDBStorage()` | Default browser durable store; supports `setMany` |
+| OPFS | `OfflineStorage.OPFS` / `createOPFSStorage()` | Origin Private File System |
+| SQLite | `createSQLiteStorage({ driver })` | SQL pushdown; Node via `createBetterSqlite3DriverAsync` |
+
+## Next steps
+
+- [Live demo](demo.html) — device → outbox → remote with DevTools
+- [Plugins](plugins.html) — deeper plugin APIs
+- [AI.md](ai.html) — paste into Cursor / Copilot / ChatGPT to implement OfflineJS
+- [Sync engine](sync.html) · [Storage](storage.html) · [Performance](performance.html)

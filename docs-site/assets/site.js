@@ -80,7 +80,48 @@ const mobileNav = () => {
   });
 };
 
+const copyButtons = () => {
+  document.querySelectorAll("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const targetId = button.getAttribute("data-copy-target");
+      const source = targetId ? document.getElementById(targetId) : null;
+      if (!source) {
+        return;
+      }
+
+      const text = source.textContent ?? "";
+      const status = document.getElementById("copy-ai-status");
+
+      try {
+        await navigator.clipboard.writeText(text);
+        if (status) {
+          status.hidden = false;
+          window.setTimeout(() => {
+            status.hidden = true;
+          }, 2000);
+        }
+        button.textContent = "Copied";
+        window.setTimeout(() => {
+          button.textContent = "Copy prompt";
+        }, 1600);
+      } catch {
+        // Fallback for older browsers / denied clipboard.
+        const range = document.createRange();
+        range.selectNodeContents(source);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        if (status) {
+          status.hidden = false;
+          status.textContent = "Select the prompt and copy manually (Ctrl/⌘+C)";
+        }
+      }
+    });
+  });
+};
+
 document.addEventListener("DOMContentLoaded", () => {
   reveal();
   mobileNav();
+  copyButtons();
 });

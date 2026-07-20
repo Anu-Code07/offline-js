@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
     
   </head>
   <body>
@@ -22,27 +22,30 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs/client</code></pre><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database from the one-import package.</p><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;
+        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs/client</code></pre><p>One package covers the common path. Prefer enums (<code>OfflineStorage</code>, <code>ConflictStrategyName</code>) over raw strings. Import a focused <code>@offlinejs/*</code> package only when you need a smaller bundle.</p><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database.</p><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
-  storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS
-  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
-});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>OfflineStorage.IndexedDB</code> in browsers and <code>OfflineStorage.Memory</code> elsewhere.</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody><tr><td><code>OfflineStorage</code></td><td><code>Memory</code>, <code>IndexedDB</code>, <code>OPFS</code></td></tr><tr><td><code>ConflictStrategyName</code></td><td><code>ClientWins</code>, <code>ServerWins</code>, <code>LastWriteWins</code>, <code>Merge</code></td></tr></tbody></table></div><p>Need a specialized helper? Import it from the same package:</p><pre><code>import {
+  storage: OfflineStorage.IndexedDB, // Memory | IndexedDB | OPFS
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins },
+  plugins: [] // see Plugins below
+});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>OfflineStorage.IndexedDB</code> in browsers and <code>OfflineStorage.Memory</code> elsewhere.</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody><tr><td><code>OfflineStorage</code></td><td><code>Memory</code>, <code>IndexedDB</code>, <code>OPFS</code></td></tr><tr><td><code>ConflictStrategyName</code></td><td><code>ClientWins</code>, <code>ServerWins</code>, <code>LastWriteWins</code>, <code>Merge</code></td></tr></tbody></table></div><p>Common options:</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Option</th><th>Purpose</th></tr></thead><tbody><tr><td><code>baseURL</code></td><td>Prefix for default fetch transport</td></tr><tr><td><code>storage</code></td><td>Adapter instance or <code>OfflineStorage</code> preset</td></tr><tr><td><code>network</code></td><td>Online/offline monitor (defaults to browser monitor)</td></tr><tr><td><code>transport</code></td><td>Custom <code>SyncTransport</code> (push/pull HTTP or fake API)</td></tr><tr><td><code>sync</code></td><td>Auto-start, pull, conflict strategy, batching</td></tr><tr><td><code>plugins</code></td><td>Array of <code>OfflinePlugin</code> factories (devtools, auth, …)</td></tr></tbody></table></div><p>Need a specialized helper from the same package:</p><pre><code>import {
   createOfflineDB,
   createAuthTransport,
   createSQLiteStorage,
-  useOfflineCollection
-} from &quot;@offlinejs/client&quot;;</code></pre><p>Or import only that package when you want a smaller bundle:</p><pre><code>import { createSQLiteStorage } from &quot;@offlinejs/storage-sqlite&quot;;</code></pre><h2>Collections</h2><pre><code>const users = db.collection(&quot;users&quot;);
+  useOfflineCollection,
+  devtools,
+  validationPlugin
+} from &quot;@offlinejs/client&quot;;</code></pre><h2>Collections</h2><pre><code>const users = db.collection(&quot;users&quot;);
 
 await users.find({ limit: 20 });
 await users.findOne(id);
@@ -50,11 +53,84 @@ await users.create({ name: &quot;Ada&quot; });
 await users.update(id, { name: &quot;Grace&quot; });
 await users.delete(id);
 await users.sync();
-const unsubscribe = users.subscribe((records) =&gt; {});</code></pre><h2>Events</h2><p>Available events are <code>sync:start</code>, <code>sync:end</code>, <code>offline</code>, <code>online</code>, <code>queue:add</code>,
-<code>queue:complete</code>, <code>conflict</code>, and <code>error</code>.</p><p><pre><code>db.on(&quot;queue:add&quot;, (mutation) =&gt; {
+const unsubscribe = users.subscribe((records) =&gt; {});</code></pre><p>Writes land in local storage immediately and enqueue a durable outbox mutation. Call <code>db.sync()</code> (or rely on auto-sync) to flush when online.</p><h2>Events</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Event</th><th>When it fires</th></tr></thead><tbody><tr><td><code>sync:start</code> / <code>sync:end</code></td><td>Sync cycle begins / finishes</td></tr><tr><td><code>offline</code> / <code>online</code></td><td>Network monitor changes</td></tr><tr><td><code>queue:add</code> / <code>queue:complete</code></td><td>Mutation enters / leaves the outbox</td></tr><tr><td><code>conflict</code></td><td>Client and server versions diverge</td></tr><tr><td><code>error</code></td><td>Transport, validation, or storage failure</td></tr><tr><td><code>worker:message</code></td><td>Service worker / worker-sync message</td></tr><tr><td><code>coordination:message</code></td><td>Multi-tab broadcast coordination</td></tr></tbody></table></div><pre><code>db.on(&quot;queue:add&quot;, (mutation) =&gt; {
   console.debug(&quot;queued&quot;, mutation);
-});</code></pre>
-</p>
+});</code></pre><h2>Plugins (what ships today)</h2><p>Plugins add behavior without forking core. Pass them to <code>createOfflineDB({ plugins: [...] })</code> or call <code>db.use(plugin)</code> later.</p><p>Each plugin gets <code>{ db, events, network, storage }</code> in <code>setup</code> and may return a disposer.</p><h3>Built-in plugins &amp; helpers</h3><div class="table-wrap"><table class="data-table"><thead><tr><th>Export</th><th>Package</th><th>What it does</th></tr></thead><tbody><tr><td><code>devtools({ ui? })</code></td><td><code>@offlinejs/devtools</code></td><td>Logs OfflineJS events; set <code>ui: true</code> to open a floating Action/State dock</td></tr><tr><td><code>openOfflineDevtools(db)</code> / <code>createDevtoolsController(db)</code></td><td><code>@offlinejs/devtools-ui</code></td><td>Redux-style panel — floating dock or inline <code>mount(el)</code></td></tr><tr><td><code>authPlugin</code> / <code>createAuthTransport</code></td><td><code>@offlinejs/auth</code></td><td>Attaches Bearer (or custom) tokens; optional refresh on 401</td></tr><tr><td><code>validationPlugin</code> / <code>createValidatedStorage</code></td><td><code>@offlinejs/validation</code></td><td>Schema checks on write (<code>createRequiredFieldsValidator</code>, <code>createTypeValidator</code>, …)</td></tr><tr><td><code>createJsonEncryptionStorage</code></td><td><code>@offlinejs/encryption</code></td><td>AES-GCM encrypt/decrypt records at rest (Web Crypto)</td></tr><tr><td><code>coordinationPlugin</code> / <code>createBroadcastCoordination</code></td><td><code>@offlinejs/broadcast</code></td><td>Multi-tab leader election + sync debounce via <code>BroadcastChannel</code></td></tr><tr><td><code>backgroundSyncPlugin</code> / <code>registerOfflineServiceWorker</code></td><td><code>@offlinejs/sw</code></td><td>Request Background Sync / SW messages when the link returns</td></tr><tr><td><code>createWorkerSyncPlugin</code></td><td><code>@offlinejs/worker-sync</code></td><td>Move sync work into a Web Worker</td></tr></tbody></table></div><h3>DevTools (most common)</h3><pre><code>import { createOfflineDB, OfflineStorage, devtools, openOfflineDevtools } from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({
+  storage: OfflineStorage.IndexedDB,
+  plugins: [devtools({ ui: true })] // console + floating dock
+});
+
+// or open manually later:
+openOfflineDevtools(db, { position: &quot;bottom&quot; });
+// Ctrl/⌘ + Shift + O toggles the dock</code></pre><p>Inline panel (docs / embeds — used by the live demo):</p><pre><code>import { createDevtoolsController, devtools } from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({ plugins: [devtools()] });
+const panel = createDevtoolsController(db);
+panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><p>The panel shows a live <strong>Action</strong> log (<code>queue:*</code>, <code>sync:*</code>, network, conflicts, errors), filter chips + search, pause/clear, and a <strong>State / Outbox</strong> tab.</p><h3>Auth</h3><pre><code>import { createAuthTransport, createFetchTransport, authPlugin } from &quot;@offlinejs/client&quot;;
+
+const transport = createAuthTransport(createFetchTransport({ baseURL: &quot;/api&quot; }), {
+  tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;),
+  refreshToken: async () =&gt; fetchNewToken(),
+  retryOnUnauthorized: true
+});
+
+const db = createOfflineDB({
+  transport,
+  plugins: [authPlugin({ tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;) })]
+});</code></pre><h3>Validation</h3><pre><code>import {
+  createOfflineDB,
+  createRequiredFieldsValidator,
+  createTypeValidator,
+  validationPlugin
+} from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({
+  plugins: [
+    validationPlugin({
+      stock: createRequiredFieldsValidator([&quot;name&quot;, &quot;qty&quot;]),
+      // or composeValidators(createRequiredFieldsValidator([...]), createTypeValidator({ qty: &quot;number&quot; }))
+    })
+  ]
+});</code></pre><h3>Encryption at rest</h3><pre><code>import {
+  createIndexedDBStorage,
+  createJsonEncryptionStorage,
+  createWebCryptoAesGcmCodec,
+  generateAesGcmKey,
+  createOfflineDB
+} from &quot;@offlinejs/client&quot;;
+
+const key = await generateAesGcmKey();
+const codec = await createWebCryptoAesGcmCodec(key);
+const storage = createJsonEncryptionStorage(createIndexedDBStorage(), codec);
+const db = createOfflineDB({ storage });</code></pre><h3>Multi-tab coordination</h3><pre><code>import { coordinationPlugin, createOfflineDB } from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({
+  plugins: [coordinationPlugin({ channelName: &quot;my-app-offline&quot;, syncDebounceMs: 250 })]
+});</code></pre><h3>Background sync (service worker)</h3><pre><code>import {
+  backgroundSyncPlugin,
+  registerOfflineServiceWorker,
+  createOfflineDB
+} from &quot;@offlinejs/client&quot;;
+
+await registerOfflineServiceWorker({ scriptUrl: &quot;/sw.js&quot; });
+const db = createOfflineDB({
+  plugins: [backgroundSyncPlugin({ syncTag: &quot;offlinejs-sync&quot; })]
+});</code></pre><h3>Custom plugin shape</h3><pre><code>const analytics = () =&gt; ({
+  name: &quot;analytics&quot;,
+  setup({ events }) {
+    return events.on(&quot;sync:end&quot;, (result) =&gt; {
+      sendMetric(&quot;offlinejs.sync&quot;, result);
+    });
+  }
+});
+
+db.use(analytics());</code></pre><p>See <a href="plugins.html">Plugins</a> for the full guide and <a href="ai.html">AI.md</a> for copy-paste implementation prompts aimed at AI editors.</p><h2>React</h2><pre><code>import { OfflineProvider, useOfflineCollection, useOfflineStatus } from &quot;@offlinejs/client&quot;;</code></pre><p>Wrap your tree in <code>OfflineProvider</code> with a <code>db</code> instance, then use <code>useOfflineCollection(&quot;todos&quot;)</code> and <code>useOfflineStatus()</code> in components.</p><h2>Storage adapters</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Adapter</th><th>Import</th><th>Notes</th></tr></thead><tbody><tr><td>Memory</td><td><code>OfflineStorage.Memory</code> / <code>createMemoryStorage()</code></td><td>Fast, non-durable — tests &amp; SSR</td></tr><tr><td>IndexedDB</td><td><code>OfflineStorage.IndexedDB</code> / <code>createIndexedDBStorage()</code></td><td>Default browser durable store; supports <code>setMany</code></td></tr><tr><td>OPFS</td><td><code>OfflineStorage.OPFS</code> / <code>createOPFSStorage()</code></td><td>Origin Private File System</td></tr><tr><td>SQLite</td><td><code>createSQLiteStorage({ driver })</code></td><td>SQL pushdown; Node via <code>createBetterSqlite3DriverAsync</code></td></tr></tbody></table></div><h2>Next steps</h2><ul><li><a href="demo.html">Live demo</a> — device → outbox → remote with DevTools</li>
+<li><a href="plugins.html">Plugins</a> — deeper plugin APIs</li>
+<li><a href="ai.html">AI.md</a> — paste into Cursor / Copilot / ChatGPT to implement OfflineJS</li>
+<li><a href="sync.html">Sync engine</a> · <a href="storage.html">Storage</a> · <a href="performance.html">Performance</a></li>
+</ul>
       </article>
     </div>
   
@@ -71,13 +147,14 @@ const unsubscribe = users.subscribe((records) =&gt; {});</code></pre><h2>Events<
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js?v=358c0d16cc"></script>
+    <script src="assets/site.js?v=296300df19"></script>
     
   </body>
 </html>

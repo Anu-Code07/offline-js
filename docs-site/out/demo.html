@@ -11,8 +11,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
-    <link rel="stylesheet" href="assets/demo-stock.css?v=0b99ae6d63" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
+    <link rel="stylesheet" href="assets/demo-stock.css?v=1cdec2631c" />
   </head>
   <body>
     <div class="site-shell">
@@ -22,7 +22,7 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html" aria-current="page">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html" aria-current="page">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
@@ -110,6 +110,35 @@
         <p class="demo-meta">Redux-style Action / State panel from <code>createDevtoolsController(db).mount()</code> — also try <code>openOfflineDevtools(db)</code> for a floating dock.</p>
         <div class="demo-devtools" id="offlinejs-devtools"></div>
       </section>
+
+      <section class="demo-panel demo-ai" aria-label="AI implementation prompt">
+        <div class="demo-ai-header">
+          <div>
+            <h2>Build this with an AI editor</h2>
+            <p class="demo-meta">
+              Copy the prompt below into Cursor, Copilot, or ChatGPT — or open the full
+              <a href="ai.html"><code>AI.md</code></a> guide (plugins, React, hard rules).
+            </p>
+          </div>
+          <button class="button button-primary" type="button" id="copy-ai-prompt" data-copy-target="ai-prompt-text">
+            Copy prompt
+          </button>
+        </div>
+        <pre class="demo-ai-prompt" id="ai-prompt-text" tabindex="0">Implement an offline-first feature with OfflineJS (@offlinejs/client).
+
+Requirements:
+- pnpm add @offlinejs/client
+- createOfflineDB with OfflineStorage.IndexedDB
+- ConflictStrategyName.LastWriteWins (make strategy selectable if building a demo)
+- Local collection writes + durable outbox + db.sync() when online
+- Include BrowserNetworkMonitor so offline mode queues mutations
+- Add DevTools: createDevtoolsController(db).mount(#el) or devtools({ ui: true })
+- Demo UI: three columns Device | Outbox | Remote like this page
+- Do not hand-roll IndexedDB or a custom sync queue
+- Use shipped plugins (auth, validation, encryption, coordination) only if needed
+- Follow https://offline-js-next2.vercel.app/ai for the full AI.md</pre>
+        <p class="demo-ai-status" id="copy-ai-status" hidden>Copied to clipboard</p>
+      </section>
     </main>
   
       <footer class="footer">
@@ -125,13 +154,14 @@
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js?v=358c0d16cc"></script>
+    <script src="assets/site.js?v=296300df19"></script>
     <script type="module" src="assets/demo-stock.js?v=0490cbd68e"></script>
   </body>
 </html>

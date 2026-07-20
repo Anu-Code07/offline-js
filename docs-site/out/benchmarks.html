@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
     
   </head>
   <body>
@@ -22,13 +22,13 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="benchmarks.html" aria-current="page">Benchmarks</a><a href="performance.html">Performance</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>OfflineJS Benchmarks</h1><p class="content-meta">Generated: 2026-07-20T07:16:02.466Z · Node v22.14.0</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Adapter</th><th>Metric</th><th style="text-align:right">Dataset</th><th style="text-align:right">Duration</th><th style="text-align:right">Throughput</th></tr></thead><tbody><tr><td>memory</td><td>writes</td><td style="text-align:right">5,000</td><td style="text-align:right">13.77ms</td><td style="text-align:right">363,165 ops/s</td></tr><tr><td>memory</td><td>batch-writes</td><td style="text-align:right">5,000</td><td style="text-align:right">13.23ms</td><td style="text-align:right">378,006 ops/s</td></tr><tr><td>memory</td><td>find</td><td style="text-align:right">5,000</td><td style="text-align:right">2.36ms</td><td style="text-align:right">42,419 ops/s</td></tr><tr><td>memory</td><td>indexed-find</td><td style="text-align:right">5,000</td><td style="text-align:right">0.34ms</td><td style="text-align:right">294,035 ops/s</td></tr><tr><td>indexeddb</td><td>writes</td><td style="text-align:right">5,000</td><td style="text-align:right">268.15ms</td><td style="text-align:right">18,647 ops/s</td></tr><tr><td>indexeddb</td><td>batch-writes</td><td style="text-align:right">5,000</td><td style="text-align:right">92.23ms</td><td style="text-align:right">54,210 ops/s</td></tr><tr><td>indexeddb</td><td>find</td><td style="text-align:right">5,000</td><td style="text-align:right">31.04ms</td><td style="text-align:right">3,222 ops/s</td></tr><tr><td>indexeddb</td><td>indexed-find</td><td style="text-align:right">5,000</td><td style="text-align:right">15.74ms</td><td style="text-align:right">6,352 ops/s</td></tr><tr><td>sqlite</td><td>writes</td><td style="text-align:right">5,000</td><td style="text-align:right">15.37ms</td><td style="text-align:right">325,333 ops/s</td></tr><tr><td>sqlite</td><td>batch-writes</td><td style="text-align:right">5,000</td><td style="text-align:right">17.76ms</td><td style="text-align:right">281,537 ops/s</td></tr><tr><td>sqlite</td><td>find</td><td style="text-align:right">5,000</td><td style="text-align:right">3.31ms</td><td style="text-align:right">1,509,827 ops/s</td></tr><tr><td>sqlite</td><td>indexed-find</td><td style="text-align:right">5,000</td><td style="text-align:right">2.88ms</td><td style="text-align:right">34,704 ops/s</td></tr></tbody></table></div><h2>Notes</h2><ul><li>Writes measure sequential storage.set throughput.</li>
@@ -61,13 +61,14 @@
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js?v=358c0d16cc"></script>
+    <script src="assets/site.js?v=296300df19"></script>
     
   </body>
 </html>

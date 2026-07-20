@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
+    <link rel="stylesheet" href="assets/styles.css?v=caa7b1da8a" />
     
   </head>
   <body>
@@ -22,13 +22,13 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>Quick Start</h1><p>Install OfflineJS and start writing local-first data in minutes.</p><pre><code>pnpm add @offlinejs/client</code></pre><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;
@@ -41,7 +41,7 @@ const db = createOfflineDB({
 
 const todos = db.collection(&quot;todos&quot;);
 await todos.create({ title: &quot;Ship offline sync&quot;, completed: false });
-const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path: <code>@offlinejs/client</code>. Prefer enums like <code>OfflineStorage.IndexedDB</code> over raw strings. Need a smaller bundle? Import a focused package like <code>@offlinejs/storage-sqlite</code>, <code>@offlinejs/broadcast</code>, or <code>@offlinejs/sw</code>.</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
+const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path: <code>@offlinejs/client</code>. Prefer enums like <code>OfflineStorage.IndexedDB</code> over raw strings. Need a smaller bundle? Import a focused package like <code>@offlinejs/storage-sqlite</code>, <code>@offlinejs/broadcast</code>, or <code>@offlinejs/sw</code>.</p><p>Plugins (DevTools, auth, validation, encryption, multi-tab, background sync) are documented in the <a href="api.html">API</a> and <a href="plugins.html">Plugins</a> pages. Paste <a href="ai.html">AI.md</a> into an AI editor to implement OfflineJS (including the stock demo).</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
 <li>Mutations enter a durable outbox queue.</li>
 <li>Sync resumes when the network returns.</li>
 <li>Conflicts resolve with your chosen strategy.</li>
@@ -68,13 +68,14 @@ const open = await todos.find({ filters: { completed: false } });</code></pre><p
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
       </footer>
     </div>
-    <script src="assets/site.js?v=358c0d16cc"></script>
+    <script src="assets/site.js?v=296300df19"></script>
     
   </body>
 </html>

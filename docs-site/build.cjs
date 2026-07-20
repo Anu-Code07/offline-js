@@ -20,9 +20,10 @@ const pages = [
   ["architecture", "docs/architecture.md", "Architecture", "docs"],
   ["storage", "docs/storage-adapters.md", "Storage", "docs"],
   ["sync", "docs/sync-engine.md", "Sync", "docs"],
+  ["plugins", "docs/plugins.md", "Plugins", "docs"],
+  ["ai", "docs/ai.md", "AI.md", "docs"],
   ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["performance", "docs/performance.md", "Performance", "docs"],
-  ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["contracts", "docs/public-contracts.md", "Contracts", "docs"],
   ["practices", "docs/best-practices.md", "Practices", "docs"],
   ["roadmap", "docs/roadmap-implementation.md", "Roadmap", "docs"],
@@ -73,6 +74,8 @@ const open = await todos.find({ filters: { completed: false } });
 \`\`\`
 
 One package covers the common path: \`@offlinejs/client\`. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need a smaller bundle? Import a focused package like \`@offlinejs/storage-sqlite\`, \`@offlinejs/broadcast\`, or \`@offlinejs/sw\`.
+
+Plugins (DevTools, auth, validation, encryption, multi-tab, background sync) are documented in the [API](api.html) and [Plugins](plugins.html) pages. Paste [AI.md](ai.html) into an AI editor to implement OfflineJS (including the stock demo).
 
 ## What happens next
 
@@ -190,7 +193,8 @@ function shell({ title, current, body, head = "", scripts = "" }) {
           <div class="footer-links">
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
-            <a href="architecture.html">Architecture</a>
+            <a href="plugins.html">Plugins</a>
+            <a href="ai.html">AI.md</a>
             <a href="benchmarks.html">Benchmarks</a>
           </div>
         </div>
@@ -493,8 +497,8 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
         </p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
-          <a class="button button-secondary" href="storage.html">Storage</a>
-          <a class="button button-secondary" href="plugins.html">DevTools</a>
+          <a class="button button-secondary" href="plugins.html">Plugins</a>
+          <a class="button button-secondary" href="ai.html">AI.md</a>
           <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>
@@ -590,6 +594,35 @@ function renderDemo() {
         <p class="demo-meta">Redux-style Action / State panel from <code>createDevtoolsController(db).mount()</code> — also try <code>openOfflineDevtools(db)</code> for a floating dock.</p>
         <div class="demo-devtools" id="offlinejs-devtools"></div>
       </section>
+
+      <section class="demo-panel demo-ai" aria-label="AI implementation prompt">
+        <div class="demo-ai-header">
+          <div>
+            <h2>Build this with an AI editor</h2>
+            <p class="demo-meta">
+              Copy the prompt below into Cursor, Copilot, or ChatGPT — or open the full
+              <a href="ai.html"><code>AI.md</code></a> guide (plugins, React, hard rules).
+            </p>
+          </div>
+          <button class="button button-primary" type="button" id="copy-ai-prompt" data-copy-target="ai-prompt-text">
+            Copy prompt
+          </button>
+        </div>
+        <pre class="demo-ai-prompt" id="ai-prompt-text" tabindex="0">Implement an offline-first feature with OfflineJS (@offlinejs/client).
+
+Requirements:
+- pnpm add @offlinejs/client
+- createOfflineDB with OfflineStorage.IndexedDB
+- ConflictStrategyName.LastWriteWins (make strategy selectable if building a demo)
+- Local collection writes + durable outbox + db.sync() when online
+- Include BrowserNetworkMonitor so offline mode queues mutations
+- Add DevTools: createDevtoolsController(db).mount(#el) or devtools({ ui: true })
+- Demo UI: three columns Device | Outbox | Remote like this page
+- Do not hand-roll IndexedDB or a custom sync queue
+- Use shipped plugins (auth, validation, encryption, coordination) only if needed
+- Follow https://offline-js-next2.vercel.app/ai for the full AI.md</pre>
+        <p class="demo-ai-status" id="copy-ai-status" hidden>Copied to clipboard</p>
+      </section>
     </main>
   `;
 
@@ -645,11 +678,13 @@ function markdownToHtml(markdown) {
     .replace(/(?:^\|.+\|[ \t]*(?:\n|$))+/gm, (tableBlock) => renderMarkdownTable(tableBlock))
     .replace(/^- (.*)$/gm, "<li>$1</li>")
     .replace(/(?:<li>.*<\/li>\n?)+/g, (block) => `<ul>${block}</ul>`)
+    .replace(/^---$/gm, "<hr />")
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/^/, "<p>")
     .replace(/$/, "</p>")
     .replace(/<p><h/g, "<h")
     .replace(/<\/h([1-3])><\/p>/g, "</h$1>")
+    .replace(/<p><hr \/>\s*<\/p>/g, "<hr />")
     .replace(/<p><ul>/g, "<ul>")
     .replace(/<\/ul><\/p>/g, "</ul>")
     .replace(/<p><div class="table-wrap">/g, '<div class="table-wrap">')

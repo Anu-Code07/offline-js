@@ -363,11 +363,12 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 
 | Doc | What it covers |
 | --- | --- |
-| [API reference](./docs/api-reference.md) | `createOfflineDB`, collections, events |
+| [API reference](./docs/api-reference.md) | `createOfflineDB`, collections, events, **plugin catalog** |
+| [Plugins](./docs/plugins.md) | DevTools, auth, validation, encryption, coordination, SW |
+| [AI.md](./AI.md) | Paste into AI editors — copy-paste demos + hard rules |
 | [Best practices](./docs/best-practices.md) | Storage, sync, and production tips |
 | [Storage adapters](./docs/storage-adapters.md) | Choosing and configuring adapters |
 | [Sync engine](./docs/sync-engine.md) | Push, pull, delta, retries |
-| [Plugins](./docs/plugins.md) | Extending OfflineJS |
 | [FAQ](./docs/faq.md) | Common consumer questions |
 | [Architecture](./docs/architecture.md) | How the pieces fit together |
 | [Benchmarks](./docs/benchmarks.md) | Measured adapter scores (`pnpm bench`) |
