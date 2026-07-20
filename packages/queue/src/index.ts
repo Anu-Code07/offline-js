@@ -91,21 +91,44 @@ export class MutationQueue {
       return [];
     }
 
+    return this.selectDue(await this.all(), options);
+  }
+
+  /** Filter an already-loaded queue snapshot without an extra storage read. */
+  selectDue(
+    mutations: QueuedMutation[],
+    options: QueueProcessingOptions = defaultQueueProcessingOptions
+  ): QueuedMutation[] {
+    if (this.paused) {
+      return [];
+    }
+
     const timestamp = now();
-    const mutations = await this.all();
+    const due: QueuedMutation[] = [];
 
-    return mutations
-      .filter((mutation) => mutation.status !== "processing")
-      .filter((mutation) => mutation.retries < options.retry.maxAttempts)
-      .filter((mutation) => {
-        if (!mutation.lastAttemptAt) {
-          return true;
-        }
+    for (const mutation of mutations) {
+      if (mutation.status === "processing") {
+        continue;
+      }
 
+      if (mutation.retries >= options.retry.maxAttempts) {
+        continue;
+      }
+
+      if (mutation.lastAttemptAt) {
         const delay = backoffDelay(mutation.retries, options.retry);
-        return mutation.lastAttemptAt + delay <= timestamp;
-      })
-      .slice(0, options.batchSize);
+        if (mutation.lastAttemptAt + delay > timestamp) {
+          continue;
+        }
+      }
+
+      due.push(mutation);
+      if (due.length >= options.batchSize) {
+        break;
+      }
+    }
+
+    return due;
   }
 
   async remove(id: string): Promise<void> {

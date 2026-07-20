@@ -24,6 +24,7 @@ import type {
 import {
   assertStorageAdapter,
   assertSyncTransport,
+  applyQuery,
   countQuery,
   createId,
   normalizeError,
@@ -331,10 +332,9 @@ class OfflineDataCollection<TRecord extends EntityRecord> implements OfflineColl
   }
 
   async paginate(query: QueryOptions<TRecord> = {}): Promise<PaginatedResult<TRecord>> {
-    const [data, allRecords] = await Promise.all([
-      this.find(query),
-      this.storage.find<TRecord>(this.name)
-    ]);
+    // One storage read — derive page + total from the same snapshot.
+    const allRecords = await this.storage.find<TRecord>(this.name);
+    const data = applyQuery(allRecords, query);
 
     return {
       data,

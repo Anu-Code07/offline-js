@@ -196,9 +196,21 @@ export {
   handlePush
 } from "@offlinejs/sync-protocol";
 export {
+  benchmarkAdapterBatchWrites,
   benchmarkAdapterFind,
   benchmarkAdapterWrites,
+  benchmarkIndexedFind,
   createBenchmarkRecord,
   formatBenchmarkResult,
-  runAdapterBenchmarkSuite
+  formatPerformanceReportMarkdown,
+  runAdapterBenchmarkSuite,
+  runPerformanceReport
+} from "@offlinejs/benchmarks";
+export type {
+  AdapterBenchmarkOptions,
+  BenchmarkResult,
+  BenchmarkSuiteResult,
+  PerformanceReport,
+  PerformanceReportAdapter,
+  PerformanceScore
 } from "@offlinejs/benchmarks";

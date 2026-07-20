@@ -11,6 +11,8 @@ import {
   applyQuery,
   findMatchingIndex,
   getEqualityFilterLookups,
+  indexSatisfiesQuery,
+  queryPageWindow,
   readIndexFields,
   serializeCompoundIndexValue
 } from "@offlinejs/utils";
@@ -114,8 +116,12 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
   ): Promise<TRecord[]> {
     await this.initialize();
     const indexed = await this.findViaIndex<TRecord>(collection, query);
+    if (indexed?.complete) {
+      return indexed.records;
+    }
+
     const records =
-      indexed ??
+      indexed?.records ??
       (
         await this.driver.query<SQLiteRecordRow>(
           `SELECT value FROM ${this.tableName} WHERE collection = ?`,
@@ -221,7 +227,7 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
   private async findViaIndex<TRecord extends EntityRecord>(
     collection: string,
     query?: QueryOptions<TRecord>
-  ): Promise<TRecord[] | null> {
+  ): Promise<{ complete: boolean; records: TRecord[] } | null> {
     const match = findMatchingIndex(
       await this.listIndexes(collection),
       getEqualityFilterLookups(query?.filters)
@@ -232,20 +238,31 @@ export class SQLiteStorageAdapter implements IndexableStorageAdapter {
     }
 
     const valueKey = serializeCompoundIndexValue(match.values);
-    const rows = await this.driver.query<{ record_id: string }>(
+    let rows = await this.driver.query<{ record_id: string }>(
       `SELECT record_id FROM ${this.tableName}_index_entries WHERE collection = ? AND index_name = ? AND value_key = ?`,
       [collection, match.index.name, valueKey]
     );
-    const records: TRecord[] = [];
+    const complete = indexSatisfiesQuery(match, query);
 
-    for (const row of rows) {
-      const record = await this.get<TRecord>(collection, row.record_id);
-      if (record) {
-        records.push(record);
-      }
+    if (complete) {
+      const { offset, limit } = queryPageWindow(query);
+      rows = limit === undefined ? rows.slice(offset) : rows.slice(offset, offset + limit);
     }
 
-    return records;
+    if (rows.length === 0) {
+      return { complete, records: [] };
+    }
+
+    const placeholders = rows.map(() => "?").join(", ");
+    const values = await this.driver.query<SQLiteRecordRow>(
+      `SELECT value FROM ${this.tableName} WHERE collection = ? AND id IN (${placeholders})`,
+      [collection, ...rows.map((row) => row.record_id)]
+    );
+
+    return {
+      complete,
+      records: values.map((row) => JSON.parse(row.value) as TRecord)
+    };
   }
 
   private async assertUniqueIndexes(
