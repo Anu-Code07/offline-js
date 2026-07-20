@@ -41,6 +41,44 @@
       </div>
     </section>
 
+    
+    <section class="section bench-landing" aria-label="Benchmark scores">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Benchmarks</p>
+        <h2 class="section-title reveal">Measured on real adapters.</h2>
+        <p class="section-copy reveal">
+          10,000-record suite against memory, IndexedDB, and SQLite — not synthetic demos.
+        </p>
+        <div class="bench-strip">
+          
+            <article class="bench-score reveal" style="--bench-delay: 0ms">
+              <p class="bench-score-label">Memory writes</p>
+              <p class="bench-score-value">455k</p>
+              <p class="bench-score-detail">ops/s sequential set</p>
+            </article>
+            <article class="bench-score reveal" style="--bench-delay: 80ms">
+              <p class="bench-score-label">Memory indexed find</p>
+              <p class="bench-score-value">0.37ms</p>
+              <p class="bench-score-detail">equality lookup + limit 100</p>
+            </article>
+            <article class="bench-score reveal" style="--bench-delay: 160ms">
+              <p class="bench-score-label">IndexedDB indexed find</p>
+              <p class="bench-score-value">55ms</p>
+              <p class="bench-score-detail">browser durable adapter</p>
+            </article>
+            <article class="bench-score reveal" style="--bench-delay: 240ms">
+              <p class="bench-score-label">SQLite indexed find</p>
+              <p class="bench-score-value">4.8ms</p>
+              <p class="bench-score-detail">SQL adapter path</p>
+            </article>
+        </div>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="benchmarks.html">See full scores</a>
+          <a class="button button-secondary" href="demo.html">Watch the sync pipeline</a>
+        </div>
+      </div>
+    </section>
+
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Why OfflineJS</p>

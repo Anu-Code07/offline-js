@@ -37,7 +37,7 @@ function main() {
   mkdirSync(output, { recursive: true });
   cpSync(assets, join(output, "assets"), { recursive: true });
 
-  writeFileSync(join(output, "index.html"), renderHome(), "utf8");
+  writeFileSync(join(output, "index.html"), renderHome(loadBenchmarkHighlights()), "utf8");
   writeFileSync(join(output, "demo.html"), renderDemo(), "utf8");
 
   for (const [slug, source, title] of pages) {
@@ -168,7 +168,128 @@ function shell({ title, current, body, head = "", scripts = "" }) {
 </html>`;
 }
 
-function renderHome() {
+function loadBenchmarkHighlights() {
+  const candidates = [
+    join(assets, "benchmark-results.json"),
+    join(workspace, "docs/benchmark-results.json")
+  ];
+
+  for (const path of candidates) {
+    if (!existsSync(path)) {
+      continue;
+    }
+
+    try {
+      const report = JSON.parse(readFileSync(path, "utf8"));
+      const scores = Array.isArray(report.scores) ? report.scores : [];
+      const pick = (adapter, metric) =>
+        scores.find((score) => score.adapter === adapter && score.metric === metric);
+
+      const memoryWrites = pick("memory", "writes");
+      const memoryIndexed = pick("memory", "indexed-find");
+      const idbIndexed = pick("indexeddb", "indexed-find");
+      const sqliteIndexed = pick("sqlite", "indexed-find");
+      const datasetSize = report.adapters?.[0]?.datasetSize ?? 10_000;
+
+      return {
+        datasetSize,
+        generatedAt: report.generatedAt,
+        items: [
+          memoryWrites
+            ? {
+                label: "Memory writes",
+                value: formatOps(memoryWrites.opsPerSecond),
+                detail: "ops/s sequential set"
+              }
+            : null,
+          memoryIndexed
+            ? {
+                label: "Memory indexed find",
+                value: formatMs(memoryIndexed.durationMs),
+                detail: "equality lookup + limit 100"
+              }
+            : null,
+          idbIndexed
+            ? {
+                label: "IndexedDB indexed find",
+                value: formatMs(idbIndexed.durationMs),
+                detail: "browser durable adapter"
+              }
+            : null,
+          sqliteIndexed
+            ? {
+                label: "SQLite indexed find",
+                value: formatMs(sqliteIndexed.durationMs),
+                detail: "SQL adapter path"
+              }
+            : null
+        ].filter(Boolean)
+      };
+    } catch {
+      // Fall through to empty highlights.
+    }
+  }
+
+  return { datasetSize: 10_000, generatedAt: null, items: [] };
+}
+
+function formatOps(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${Math.round(value / 1_000)}k`;
+  }
+  return `${Math.round(value)}`;
+}
+
+function formatMs(value) {
+  if (!Number.isFinite(value)) {
+    return "—";
+  }
+  if (value < 1) {
+    return `${value.toFixed(2)}ms`;
+  }
+  if (value < 10) {
+    return `${value.toFixed(1)}ms`;
+  }
+  return `${Math.round(value)}ms`;
+}
+
+function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
+  const benchSection =
+    highlights.items.length === 0
+      ? ""
+      : `
+    <section class="section bench-landing" aria-label="Benchmark scores">
+      <div class="section-inner">
+        <p class="section-kicker reveal">Benchmarks</p>
+        <h2 class="section-title reveal">Measured on real adapters.</h2>
+        <p class="section-copy reveal">
+          ${highlights.datasetSize.toLocaleString()}-record suite against memory, IndexedDB, and SQLite — not synthetic demos.
+        </p>
+        <div class="bench-strip">
+          ${highlights.items
+            .map(
+              (item, index) => `
+            <article class="bench-score reveal" style="--bench-delay: ${index * 80}ms">
+              <p class="bench-score-label">${escapeHtml(item.label)}</p>
+              <p class="bench-score-value">${escapeHtml(item.value)}</p>
+              <p class="bench-score-detail">${escapeHtml(item.detail)}</p>
+            </article>`
+            )
+            .join("")}
+        </div>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="benchmarks.html">See full scores</a>
+          <a class="button button-secondary" href="demo.html">Watch the sync pipeline</a>
+        </div>
+      </div>
+    </section>`;
+
   const body = `
     <section class="hero">
       <div class="hero-visual" aria-hidden="true">
@@ -187,6 +308,8 @@ function renderHome() {
         </div>
       </div>
     </section>
+
+    ${benchSection}
 
     <section class="section">
       <div class="section-inner">
