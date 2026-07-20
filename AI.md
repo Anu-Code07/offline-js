@@ -200,6 +200,25 @@ Prefer enums: `OfflineStorage.IndexedDB` over `"indexeddb"` when generating new 
 
 ---
 
+## Photo / blob uploads (media queue)
+
+For durable offline **file uploads** (not JSON records), use `createMediaQueue` — IndexedDB queue, image compress, chunked resume:
+
+```ts
+import { createMediaQueue } from "@offlinejs/client";
+
+const media = createMediaQueue({
+  endpoint: "/api/uploads",
+  compress: { images: { maxWidth: 1600 } }
+});
+media.on("complete", ({ id, url }) => {});
+await media.enqueue(file);
+```
+
+Do not hand-roll blob upload queues. Docs: https://offline-js-next2.vercel.app/media-queue
+
+---
+
 ## Hard rules for AI agents
 
 1. **Install** `@offlinejs/client` unless the user asks for a focused `@offlinejs/*` package.  
@@ -241,5 +260,7 @@ Requirements:
 | `packages/sync` / `packages/queue` | Sync engine + outbox |
 | `packages/storage-*` | Memory, IndexedDB, OPFS, SQLite |
 | `packages/devtools` / `devtools-ui` | Logger plugin + UI |
+| `packages/cache` | npm `@offlinejs/http-cache` |
+| `packages/media-queue` | npm `@offlinejs/media-queue` |
 | `docs-site/demo` | Stock demo source (`app.ts`) |
 | `docs/` | Markdown docs built into the static site |

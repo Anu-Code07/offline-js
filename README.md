@@ -358,6 +358,8 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | `@offlinejs/validation` | Schema validation around storage |
 | `@offlinejs/encryption` | Encrypt records at rest |
 | `@offlinejs/devtools` / `@offlinejs/devtools-ui` | Redux-style Action/State DevTools (floating dock or inline) |
+| `@offlinejs/http-cache` | TTL / SWR HTTP GET cache |
+| `@offlinejs/media-queue` | Durable offline media uploads (compress, chunk, resume) |
 
 ## Docs
 
@@ -366,6 +368,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | [API reference](./docs/api-reference.md) | `createOfflineDB`, collections, events, **plugin catalog** |
 | [Plugins](./docs/plugins.md) | DevTools, auth, validation, encryption, coordination, SW |
 | [HTTP cache](./docs/cache.md) | TTL / stale-while-revalidate GET cache (`@offlinejs/http-cache`) |
+| [Media queue](./docs/media-queue.md) | Offline photo uploads that resume (`@offlinejs/media-queue`) |
 | [AI.md](./AI.md) | Paste into AI editors — copy-paste demos + hard rules |
 | [Best practices](./docs/best-practices.md) | Storage, sync, and production tips |
 | [Storage adapters](./docs/storage-adapters.md) | Choosing and configuring adapters |

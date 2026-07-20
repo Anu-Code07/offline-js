@@ -50,6 +50,11 @@
     "url": "/cache.html"
   },
   {
+    "slug": "media-queue",
+    "title": "Media queue",
+    "url": "/media-queue.html"
+  },
+  {
     "slug": "benchmarks",
     "title": "Benchmarks",
     "url": "/benchmarks.html"

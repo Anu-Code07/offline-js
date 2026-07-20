@@ -28,7 +28,7 @@
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html" aria-current="page">AI.md</a><a href="cache.html">Cache</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html" aria-current="page">AI.md</a><a href="cache.html">Cache</a><a href="media-queue.html">Media queue</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>OfflineJS — AI editor guide</h1><p>Paste this file into Cursor, Copilot Chat, Claude, ChatGPT, or any AI coding agent when you want it to <strong>implement OfflineJS correctly</strong> (including a demo like the stock sync board).</p><hr /></p><h2>Product in one paragraph</h2><p>OfflineJS (<code>@offlinejs/client</code>) is a TypeScript <strong>offline-first data layer</strong>. Apps write to local storage immediately; mutations enter a <strong>durable outbox</strong>; sync flushes to a remote API when online; <strong>conflict strategies</strong> resolve divergences. Prefer the one-import client package. Do not invent parallel IndexedDB wrappers or custom outbox queues.</p><p>Canonical install:</p><pre><code>pnpm add @offlinejs/client</code></pre><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;</code></pre><p>Live reference demo: device → outbox → remote stock board with DevTools  
@@ -140,7 +140,14 @@ function StockBoard() {
       {/* render records; call create/update for local writes */}
     &lt;/div&gt;
   );
-}</code></pre><p>Prefer enums: <code>OfflineStorage.IndexedDB</code> over <code>&quot;indexeddb&quot;</code> when generating new code.</p><hr /></p><h2>Hard rules for AI agents</h2><p>1. <strong>Install</strong> <code>@offlinejs/client</code> unless the user asks for a focused <code>@offlinejs/*</code> package.  
+}</code></pre><p>Prefer enums: <code>OfflineStorage.IndexedDB</code> over <code>&quot;indexeddb&quot;</code> when generating new code.</p><hr /></p><h2>Photo / blob uploads (media queue)</h2><p>For durable offline <strong>file uploads</strong> (not JSON records), use <code>createMediaQueue</code> — IndexedDB queue, image compress, chunked resume:</p><pre><code>import { createMediaQueue } from &quot;@offlinejs/client&quot;;
+
+const media = createMediaQueue({
+  endpoint: &quot;/api/uploads&quot;,
+  compress: { images: { maxWidth: 1600 } }
+});
+media.on(&quot;complete&quot;, ({ id, url }) =&gt; {});
+await media.enqueue(file);</code></pre><p>Do not hand-roll blob upload queues. Docs: https://offline-js-next2.vercel.app/media-queue</p><hr /></p><h2>Hard rules for AI agents</h2><p>1. <strong>Install</strong> <code>@offlinejs/client</code> unless the user asks for a focused <code>@offlinejs/*</code> package.  
 2. <strong>Local writes first</strong> — <code>collection.create/update/delete</code> must not await the network.  
 3. <strong>Outbox is sacred</strong> — do not replace with <code>localStorage</code> mutation lists.  
 4. <strong>Conflicts</strong> — use <code>ConflictStrategyName.*</code>; don’t invent silent merges.  
@@ -158,7 +165,7 @@ Requirements:
 - Add devtools(): either floating dock (ui: true) or createDevtoolsController(db).mount(#el)
 - If building a demo: three columns Device | Outbox | Remote like https://offline-js-next2.vercel.app/demo
 - Do not hand-roll IndexedDB or a custom sync queue
-- Follow AI.md / OfflineJS docs for plugins (auth, validation, encryption, coordination) only if needed</code></pre><hr /></p><h2>Repo map (for contributors)</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>packages/offlinejs</code></td><td>npm <code>@offlinejs/client</code> umbrella</td></tr><tr><td><code>packages/core</code></td><td>DB, collections, plugin host</td></tr><tr><td><code>packages/sync</code> / <code>packages/queue</code></td><td>Sync engine + outbox</td></tr><tr><td><code>packages/storage-*</code></td><td>Memory, IndexedDB, OPFS, SQLite</td></tr><tr><td><code>packages/devtools</code> / <code>devtools-ui</code></td><td>Logger plugin + UI</td></tr><tr><td><code>docs-site/demo</code></td><td>Stock demo source (<code>app.ts</code>)</td></tr><tr><td><code>docs/</code></td><td>Markdown docs built into the static site</td></tr></tbody></table></div>
+- Follow AI.md / OfflineJS docs for plugins (auth, validation, encryption, coordination) only if needed</code></pre><hr /></p><h2>Repo map (for contributors)</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>packages/offlinejs</code></td><td>npm <code>@offlinejs/client</code> umbrella</td></tr><tr><td><code>packages/core</code></td><td>DB, collections, plugin host</td></tr><tr><td><code>packages/sync</code> / <code>packages/queue</code></td><td>Sync engine + outbox</td></tr><tr><td><code>packages/storage-*</code></td><td>Memory, IndexedDB, OPFS, SQLite</td></tr><tr><td><code>packages/devtools</code> / <code>devtools-ui</code></td><td>Logger plugin + UI</td></tr><tr><td><code>packages/cache</code></td><td>npm <code>@offlinejs/http-cache</code></td></tr><tr><td><code>packages/media-queue</code></td><td>npm <code>@offlinejs/media-queue</code></td></tr><tr><td><code>docs-site/demo</code></td><td>Stock demo source (<code>app.ts</code>)</td></tr><tr><td><code>docs/</code></td><td>Markdown docs built into the static site</td></tr></tbody></table></div>
 </p>
       </article>
     </div>
@@ -178,6 +185,7 @@ Requirements:
             <a href="quick-start.html">Quick start</a>
             <a href="plugins.html">Plugins</a>
             <a href="cache.html">HTTP cache</a>
+            <a href="media-queue.html">Media queue</a>
             <a href="ai.html">AI.md</a>
             <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
           </div>

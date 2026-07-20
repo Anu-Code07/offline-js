@@ -1,0 +1,33 @@
+{
+  "name": "@offlinejs/media-queue",
+  "version": "0.1.0",
+  "description": "Durable offline media upload queue — compress images, chunk, resume, survive kills and flaky networks.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@offlinejs/utils": "workspace:*"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
+    "tsup": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

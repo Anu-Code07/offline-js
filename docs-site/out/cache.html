@@ -28,7 +28,7 @@
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="cache.html" aria-current="page">Cache</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="cache.html" aria-current="page">Cache</a><a href="media-queue.html">Media queue</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>HTTP cache (<code>@offlinejs/http-cache</code>)</h1><p>General-purpose <strong>read-through</strong> cache for GET/JSON (and optional Cache API for assets).</p><p>This is <strong>not</strong> the offline mutation queue. Use <code>createOfflineDB</code> when users must write offline and sync later. Use this package when you want faster / offline-*readable* HTTP responses with TTL.</p><h2>Install</h2><p>Already included with <a href="https://www.npmjs.com/package/@offlinejs/client"><code>@offlinejs/client</code></a> <strong>0.1.2+</strong>, or install the focused package:</p><pre><code>pnpm add @offlinejs/http-cache
@@ -84,6 +84,7 @@ await clearHttpCache(store);</code></pre><h2>With OfflineJS together</h2><p>Typi
             <a href="quick-start.html">Quick start</a>
             <a href="plugins.html">Plugins</a>
             <a href="cache.html">HTTP cache</a>
+            <a href="media-queue.html">Media queue</a>
             <a href="ai.html">AI.md</a>
             <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
           </div>

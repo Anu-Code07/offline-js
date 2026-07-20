@@ -183,6 +183,17 @@ export type {
   IndexedDBHttpCacheOptions
 } from "@offlinejs/http-cache";
 
+// Durable media uploads (images MVP — compress, chunk, resume)
+export { createMediaQueue, MediaQueue } from "@offlinejs/media-queue";
+export type {
+  ImageCompressOptions,
+  MediaJob,
+  MediaJobStatus,
+  MediaQueueCompressOptions,
+  MediaQueueEventMap,
+  MediaQueueOptions
+} from "@offlinejs/media-queue";
+
 // Plugins & advanced
 export {
   backgroundSyncPlugin,

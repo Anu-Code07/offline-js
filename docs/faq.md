@@ -34,8 +34,23 @@ const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
 | Need | Tool |
 | --- | --- |
 | Offline writes + sync + conflicts | `createOfflineDB` |
+| Photo / blob uploads that resume offline | `createMediaQueue` (`@offlinejs/media-queue`) |
 | Cache GET/JSON responses with TTL | `cachedJson` / `cachedFetch` (`@offlinejs/http-cache`) |
 | Cache static assets (JS/CSS/images) | Service Worker + Cache API (`createCacheApiStore`) |
+
+## How do I upload photos offline?
+
+Use the media queue — durable IndexedDB jobs, on-device image compress, chunked resume:
+
+```ts
+import { createMediaQueue } from "@offlinejs/client";
+
+const media = createMediaQueue({ endpoint: "/api/uploads" });
+media.on("progress", ({ id, pct }) => console.log(id, pct));
+await media.enqueue(file); // instant UI; upload when online
+```
+
+See [Media queue](media-queue.html).
 
 ## Which package should I install?
 
