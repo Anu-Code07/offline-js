@@ -4,9 +4,10 @@
 
 ```bash
 pnpm add @offlinejs/client
+# npm i @offlinejs/client
 ```
 
-One package covers the common path. Prefer enums (`OfflineStorage`, `ConflictStrategyName`) over raw strings. Import a focused `@offlinejs/*` package only when you need a smaller bundle.
+Published on npm as [`@offlinejs/client`](https://www.npmjs.com/package/@offlinejs/client) (latest **0.1.2**). One package covers the common path — offline DB, storage presets, plugins, React hooks, and HTTP cache helpers. Prefer enums (`OfflineStorage`, `ConflictStrategyName`) over raw strings. Import a focused `@offlinejs/*` package only when you need a smaller bundle.
 
 ## `createOfflineDB(options)`
 
@@ -246,6 +247,23 @@ Wrap your tree in `OfflineProvider` with a `db` instance, then use `useOfflineCo
 | IndexedDB | `OfflineStorage.IndexedDB` / `createIndexedDBStorage()` | Default browser durable store; supports `setMany` |
 | OPFS | `OfflineStorage.OPFS` / `createOPFSStorage()` | Origin Private File System |
 | SQLite | `createSQLiteStorage({ driver })` | SQL pushdown; Node via `createBetterSqlite3DriverAsync` |
+
+## HTTP cache
+
+For TTL / stale-while-revalidate **GET caching** (not the offline outbox), use helpers from `@offlinejs/client` or [`@offlinejs/http-cache`](https://www.npmjs.com/package/@offlinejs/http-cache):
+
+```ts
+import { cachedJson, createIndexedDBHttpCache } from "@offlinejs/client";
+
+const store = createIndexedDBHttpCache();
+const { data, fromCache } = await cachedJson("/api/catalog", undefined, {
+  store,
+  ttlMs: 60_000,
+  staleWhileRevalidateMs: 30_000
+});
+```
+
+See [HTTP cache](cache.html) for stores, invalidation, and when to use OfflineDB vs `cachedJson`.
 
 ## Next steps
 

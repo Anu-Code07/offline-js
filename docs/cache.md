@@ -6,12 +6,14 @@ This is **not** the offline mutation queue. Use `createOfflineDB` when users mus
 
 ## Install
 
-Already included with `@offlinejs/client`, or:
+Already included with [`@offlinejs/client`](https://www.npmjs.com/package/@offlinejs/client) **0.1.2+**, or install the focused package:
 
 ```bash
 pnpm add @offlinejs/http-cache
+# npm i @offlinejs/http-cache
 ```
 
+[`@offlinejs/http-cache` on npm](https://www.npmjs.com/package/@offlinejs/http-cache)
 ## Quick start
 
 ```ts
