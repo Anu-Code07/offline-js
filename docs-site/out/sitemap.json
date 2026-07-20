@@ -5,6 +5,11 @@
     "url": "/"
   },
   {
+    "slug": "demo",
+    "title": "Demo",
+    "url": "/demo.html"
+  },
+  {
     "slug": "quick-start",
     "title": "Quick Start",
     "url": "/quick-start.html"

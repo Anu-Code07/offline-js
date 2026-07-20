@@ -3,7 +3,7 @@ import type { OfflineDB, OfflineEventName, OfflineEvents } from "@offlinejs/type
 import { createDevtoolsController } from "./index";
 
 describe("devtools ui", () => {
-  it("records events, renders escaped markup, and disposes listeners", () => {
+  it("records events, live-renders via mount, and disposes listeners", () => {
     const listeners = new Map<OfflineEventName, (payload: unknown) => void>();
     const disposers: Array<ReturnType<typeof vi.fn>> = [];
     const db = {
@@ -17,6 +17,9 @@ describe("devtools ui", () => {
     const controller = createDevtoolsController(db);
     const target = { innerHTML: "" } as HTMLElement;
 
+    controller.mount(target);
+    expect(target.innerHTML).toContain("Waiting for sync");
+
     listeners.get("coordination:message")?.({
       id: "1",
       payload: "<unsafe>",
@@ -24,10 +27,10 @@ describe("devtools ui", () => {
       timestamp: 1,
       type: "sync:request"
     });
-    controller.render(target);
 
     expect(controller.events()).toHaveLength(1);
     expect(target.innerHTML).toContain("OfflineJS Devtools");
+    expect(target.innerHTML).toContain("coordination:message");
     expect(target.innerHTML).toContain("&lt;unsafe&gt;");
 
     controller.destroy();

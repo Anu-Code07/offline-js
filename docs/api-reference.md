@@ -11,16 +11,21 @@ pnpm add @offlinejs
 Creates a framework-agnostic offline database from the one-import package.
 
 ```ts
-import { createOfflineDB } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: "indexeddb", // or "memory" | "opfs" | a custom adapter
-  sync: { conflictStrategy: "lastWriteWins" }
+  storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 ```
 
-If `storage` is omitted, OfflineJS picks `"indexeddb"` in browsers and `"memory"` elsewhere.
+If `storage` is omitted, OfflineJS picks `OfflineStorage.IndexedDB` in browsers and `OfflineStorage.Memory` elsewhere.
+
+| Enum | Values |
+| --- | --- |
+| `OfflineStorage` | `Memory`, `IndexedDB`, `OPFS` |
+| `ConflictStrategyName` | `ClientWins`, `ServerWins`, `LastWriteWins`, `Merge` |
 
 Need a specialized helper? Import it from the same package:
 

@@ -7,40 +7,55 @@ import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 import { createMemoryStorage } from "@offlinejs/storage-memory";
 import { createOPFSStorage } from "@offlinejs/storage-opfs";
 import type { CollectionMap, StorageAdapter } from "@offlinejs/types";
+import { ConflictStrategyName } from "@offlinejs/types";
 
-export type StoragePreset = "memory" | "indexeddb" | "opfs";
+export { ConflictStrategyName };
+
+/** Built-in storage backends for the one-import SDK. */
+export enum OfflineStorage {
+  Memory = "memory",
+  IndexedDB = "indexeddb",
+  OPFS = "opfs"
+}
+
+/** @deprecated Prefer `OfflineStorage` enum values. */
+export type StoragePreset = `${OfflineStorage}`;
 
 export type OfflineJSOptions<TCollections extends CollectionMap = CollectionMap> = Omit<
   OfflineDBOptions<TCollections>,
   "storage"
 > & {
   /**
-   * Pass an adapter instance, or a built-in preset string.
-   * Defaults to `"indexeddb"` in browsers and `"memory"` elsewhere.
+   * Pass an adapter instance, an `OfflineStorage` enum value, or a preset string.
+   * Defaults to `OfflineStorage.IndexedDB` in browsers and `OfflineStorage.Memory` elsewhere.
    */
-  storage?: StorageAdapter | StoragePreset;
+  storage?: StorageAdapter | OfflineStorage | StoragePreset;
 };
 
 const isBrowserRuntime = (): boolean =>
   typeof globalThis.window !== "undefined" && typeof globalThis.indexedDB !== "undefined";
 
-export const resolveStorage = (storage?: StorageAdapter | StoragePreset): StorageAdapter => {
-  if (typeof storage === "object" && storage !== null) {
+const isStorageAdapter = (value: unknown): value is StorageAdapter =>
+  typeof value === "object" && value !== null && "get" in value && "set" in value;
+
+export const resolveStorage = (
+  storage?: StorageAdapter | OfflineStorage | StoragePreset
+): StorageAdapter => {
+  if (isStorageAdapter(storage)) {
     return storage;
   }
 
-  const preset = storage ?? (isBrowserRuntime() ? "indexeddb" : "memory");
+  const preset = storage ?? (isBrowserRuntime() ? OfflineStorage.IndexedDB : OfflineStorage.Memory);
 
   switch (preset) {
-    case "memory":
+    case OfflineStorage.Memory:
       return createMemoryStorage();
-    case "indexeddb":
+    case OfflineStorage.IndexedDB:
       return createIndexedDBStorage();
-    case "opfs":
+    case OfflineStorage.OPFS:
       return createOPFSStorage();
     default: {
-      const exhaustive: never = preset;
-      throw new Error(`Unknown OfflineJS storage preset: ${String(exhaustive)}`);
+      throw new Error(`Unknown OfflineJS storage preset: ${String(preset)}`);
     }
   }
 };
@@ -50,11 +65,12 @@ export const resolveStorage = (storage?: StorageAdapter | StoragePreset): Storag
  *
  * @example
  * ```ts
- * import { createOfflineDB } from "@offlinejs";
+ * import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
  *
  * const db = createOfflineDB({
  *   baseURL: "https://api.example.com",
- *   storage: "indexeddb"
+ *   storage: OfflineStorage.IndexedDB,
+ *   sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
  * });
  * ```
  */
@@ -92,6 +108,8 @@ export type {
   StorageAdapter,
   SyncTransport
 } from "@offlinejs/core";
+export type { ConflictStrategy } from "@offlinejs/types";
+export type { DevtoolsController, DevtoolsEventEntry } from "@offlinejs/devtools-ui";
 
 // Storage
 export { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";

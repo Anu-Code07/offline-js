@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/styles.css" />
+    
   </head>
   <body>
     <div class="site-shell">
@@ -18,26 +19,26 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html" aria-current="page">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>Quick Start</h1><p>Install OfflineJS and start writing local-first data in minutes.</p><pre><code>pnpm add @offlinejs</code></pre><pre><code>import { createOfflineDB } from &quot;@offlinejs&quot;;
+        <h1>Quick Start</h1><p>Install OfflineJS and start writing local-first data in minutes.</p><pre><code>pnpm add @offlinejs</code></pre><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs&quot;;
 
 const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
-  storage: &quot;indexeddb&quot;,
-  sync: { conflictStrategy: &quot;lastWriteWins&quot; }
+  storage: OfflineStorage.IndexedDB,
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 
 const todos = db.collection(&quot;todos&quot;);
 await todos.create({ title: &quot;Ship offline sync&quot;, completed: false });
-const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path. Need something specific? Import it from <code>@offlinejs</code> too, or from a focused package like <code>@offlinejs/storage-sqlite</code>.</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
+const open = await todos.find({ filters: { completed: false } });</code></pre><p>One package covers the common path. Prefer enums like <code>OfflineStorage.IndexedDB</code> over raw strings. Need something specific? Import it from <code>@offlinejs</code> too, or from a focused package like <code>@offlinejs/storage-sqlite</code>.</p><h2>What happens next</h2><ul><li>Writes land in local storage immediately.</li>
 <li>Mutations enter a durable queue.</li>
 <li>Sync resumes when the network returns.</li>
 <li>Conflicts resolve with your chosen strategy.</li>
@@ -57,5 +58,6 @@ const open = await todos.find({ filters: { completed: false } });</code></pre><p
       </footer>
     </div>
     <script src="assets/site.js"></script>
+    
   </body>
 </html>

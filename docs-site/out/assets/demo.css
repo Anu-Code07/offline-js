@@ -1,0 +1,177 @@
+.demo-page {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.demo-hero h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: -0.04em;
+}
+
+.demo-hero p {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--ink-soft);
+}
+
+.demo-toolbar,
+.demo-composer,
+.demo-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 1rem;
+}
+
+.demo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+}
+
+.demo-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.demo-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.demo-field select,
+.demo-composer input {
+  min-height: 2.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 0.45rem 0.75rem;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.demo-composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.demo-composer input {
+  flex: 1 1 16rem;
+}
+
+.demo-layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 960px) {
+  .demo-layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+    align-items: start;
+  }
+}
+
+.demo-panel h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.demo-meta {
+  margin: 0 0 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.demo-status {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.8rem;
+  background: rgba(15, 174, 154, 0.1);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.demo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.demo-item {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.demo-item-main {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 700;
+}
+
+.demo-item-main .is-done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.demo-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.demo-item-meta button,
+.demo-toolbar .button,
+.demo-composer .button {
+  min-height: 2.3rem;
+  padding: 0.45rem 0.8rem;
+}
+
+.demo-item-meta button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.demo-item-meta button.danger {
+  color: #9b2c2c;
+}
+
+.demo-empty {
+  padding: 1rem;
+  color: var(--ink-soft);
+}
+
+.demo-devtools {
+  max-height: 28rem;
+  overflow: auto;
+}
+
+.demo-devtools .offlinejs-devtools {
+  padding: 0 !important;
+}
