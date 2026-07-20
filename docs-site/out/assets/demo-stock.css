@@ -356,12 +356,21 @@ body[data-demo-link="offline"] .demo-flow-node[data-node="outbox"] {
 }
 
 .demo-devtools {
-  max-height: 22rem;
-  overflow: auto;
+  max-height: 28rem;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(16, 42, 46, 0.12);
 }
 
-.demo-devtools .offlinejs-devtools {
-  padding: 0 !important;
+.demo-devtools .ojd-root,
+.demo-devtools .ojd-inline {
+  min-height: 26rem;
+  height: 26rem;
+}
+
+.demo-devtools .ojd-shell {
+  border-radius: 0;
+  border: 0;
 }
 
 @media (max-width: 720px) {
