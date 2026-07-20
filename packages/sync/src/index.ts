@@ -1,16 +1,17 @@
 import { defaultQueueProcessingOptions, type MutationQueue } from "@offlinejs/queue";
-import type {
-  ConflictContext,
-  ConflictStrategy,
-  EntityRecord,
-  EventBus,
-  OfflineEvents,
-  QueuedMutation,
-  QueueProcessingOptions,
-  StorageAdapter,
-  SyncOptions,
-  SyncTransport,
-  TransportRequest
+import {
+  ConflictStrategyName,
+  type ConflictContext,
+  type ConflictStrategy,
+  type EntityRecord,
+  type EventBus,
+  type OfflineEvents,
+  type QueuedMutation,
+  type QueueProcessingOptions,
+  type StorageAdapter,
+  type SyncOptions,
+  type SyncTransport,
+  type TransportRequest
 } from "@offlinejs/types";
 
 export interface SyncEngineOptions {
@@ -148,7 +149,7 @@ export class SyncEngine {
       server
     };
     const resolved = await resolveConflictStrategy(
-      this.syncOptions.conflictStrategy ?? "lastWriteWins",
+      this.syncOptions.conflictStrategy ?? ConflictStrategyName.LastWriteWins,
       context
     );
 
@@ -209,15 +210,15 @@ export const resolveConflictStrategy = async (
     return strategy(context);
   }
 
-  if (strategy === "clientWins") {
+  if (strategy === ConflictStrategyName.ClientWins) {
     return context.client;
   }
 
-  if (strategy === "serverWins") {
+  if (strategy === ConflictStrategyName.ServerWins) {
     return context.server;
   }
 
-  if (strategy === "merge") {
+  if (strategy === ConflictStrategyName.Merge) {
     return context.server || context.client
       ? {
           ...(context.server ?? {}),

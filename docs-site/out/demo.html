@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <title>Live demo · OfflineJS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/styles.css" />
+    <link rel="stylesheet" href="assets/demo.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <div class="topbar-inner">
+          <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"></span>OfflineJS</a>
+          <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+            <span class="nav-toggle-bars" aria-hidden="true"></span>
+          </button>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html" aria-current="page">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+        </div>
+      </header>
+      
+    <main class="demo-page">
+      <section class="demo-hero">
+        <h1>Live offline sync demo</h1>
+        <p>
+          A tiny todos app on IndexedDB with a fake API that generates random data.
+          Toggle offline, queue writes, sync, and resolve conflicts — with the real
+          <code>@offlinejs/devtools</code> + <code>@offlinejs/devtools-ui</code> packages mounted below.
+        </p>
+      </section>
+
+      <p class="demo-status" id="demo-status">Starting demo…</p>
+
+      <section class="demo-toolbar" aria-label="Demo controls">
+        <label class="demo-toggle">
+          <input id="online-toggle" type="checkbox" checked />
+          <span id="online-label">Online</span>
+        </label>
+
+        <label class="demo-field">
+          Conflict strategy
+          <select id="conflict-strategy">
+            <option value="lastWriteWins">ConflictStrategyName.LastWriteWins</option>
+            <option value="clientWins">ConflictStrategyName.ClientWins</option>
+            <option value="serverWins">ConflictStrategyName.ServerWins</option>
+            <option value="merge">ConflictStrategyName.Merge</option>
+          </select>
+        </label>
+
+        <button class="button button-secondary" type="button" id="seed-random">Seed random API data</button>
+        <button class="button button-primary" type="button" id="sync-now">Sync now</button>
+        <button class="button button-secondary" type="button" id="simulate-conflict">Simulate conflict</button>
+        <button class="button button-secondary" type="button" id="reset-demo">Reset</button>
+      </section>
+
+      <section class="demo-composer" aria-label="Add todo">
+        <input id="todo-title" type="text" placeholder="Add a todo…" />
+        <button class="button button-primary" type="button" id="add-todo">Add locally</button>
+      </section>
+
+      <div class="demo-layout">
+        <section class="demo-panel">
+          <h2>Local collection</h2>
+          <p class="demo-meta" id="queue-meta">Loading local todos…</p>
+          <p class="demo-meta" id="server-meta">Fake API idle.</p>
+          <ul class="demo-list" id="todo-list"></ul>
+        </section>
+
+        <section class="demo-panel">
+          <h2>Package Devtools</h2>
+          <p class="demo-meta">Live timeline from <code>createDevtoolsController(db).mount()</code>.</p>
+          <div class="demo-devtools" id="offlinejs-devtools"></div>
+        </section>
+      </div>
+    </main>
+  
+      <footer class="footer">
+        <div class="section-inner">
+          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        </div>
+      </footer>
+    </div>
+    <script src="assets/site.js"></script>
+    <script type="module" src="assets/demo.js"></script>
+  </body>
+</html>

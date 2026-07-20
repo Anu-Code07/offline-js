@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  ConflictStrategyName,
   createOfflineDB,
   createIndexedDBStorage,
   createMemoryStorage,
+  OfflineStorage,
   resolveStorage
 } from "./index";
 
 describe("@offlinejs umbrella package", () => {
-  it("creates a database with a memory storage preset", async () => {
+  it("creates a database with OfflineStorage.Memory", async () => {
     const db = createOfflineDB({
-      storage: "memory",
-      sync: { enabled: false }
+      storage: OfflineStorage.Memory,
+      sync: { enabled: false, conflictStrategy: ConflictStrategyName.LastWriteWins }
     });
 
     const todos = db.collection("todos");
@@ -26,13 +28,15 @@ describe("@offlinejs umbrella package", () => {
     expect(await db.collection("notes").find()).toHaveLength(1);
   });
 
-  it("resolves explicit adapters and presets", () => {
+  it("resolves adapters, enums, and legacy string presets", () => {
     const memory = createMemoryStorage({ name: "custom-memory" });
 
     expect(resolveStorage(memory).name).toBe("custom-memory");
+    expect(resolveStorage(OfflineStorage.Memory).name).toBe("memory");
+    expect(resolveStorage(OfflineStorage.IndexedDB).name).toBe("indexeddb");
+    expect(resolveStorage(OfflineStorage.OPFS).name).toBe("opfs");
     expect(resolveStorage("memory").name).toBe("memory");
-    expect(resolveStorage("indexeddb").name).toBe("indexeddb");
-    expect(resolveStorage("opfs").name).toBe("opfs");
     expect(createIndexedDBStorage({ databaseName: "demo" }).name).toBe("indexeddb");
+    expect(ConflictStrategyName.LastWriteWins).toBe("lastWriteWins");
   });
 });

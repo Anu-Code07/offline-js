@@ -4,12 +4,12 @@ Static documentation site for OfflineJS.
 
 ## Local development
 
-Regenerate the static export (writes `out/` + local `dist/`):
+Regenerate the static export (bundles the live demo, then writes `out/` + local `dist/`):
 
 ```bash
 pnpm docs:build
-# or from this folder:
-node build.cjs
+# or:
+pnpm docs:demo && node docs-site/build.cjs
 ```
 
 Preview:

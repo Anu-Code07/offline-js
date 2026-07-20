@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/styles.css" />
+    
   </head>
   <body>
     <div class="site-shell">
@@ -18,22 +19,27 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs</code></pre><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database from the one-import package.</p><pre><code>import { createOfflineDB } from &quot;@offlinejs&quot;;
+        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs</code></pre><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database from the one-import package.</p><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs&quot;;
 
 const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
-  storage: &quot;indexeddb&quot;, // or &quot;memory&quot; | &quot;opfs&quot; | a custom adapter
-  sync: { conflictStrategy: &quot;lastWriteWins&quot; }
-});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>&quot;indexeddb&quot;</code> in browsers and <code>&quot;memory&quot;</code> elsewhere.</p><p>Need a specialized helper? Import it from the same package:</p><pre><code>import {
+  storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
+});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>OfflineStorage.IndexedDB</code> in browsers and <code>OfflineStorage.Memory</code> elsewhere.</p><table><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody>
+</tbody></table>@@TABLE_DIVIDER@@
+<table><thead><tr><th><code>OfflineStorage</code></th><th><code>Memory</code>, <code>IndexedDB</code>, <code>OPFS</code></th></tr></thead><tbody>
+<tr><td><code>ConflictStrategyName</code></td><td><code>ClientWins</code>, <code>ServerWins</code>, <code>LastWriteWins</code>, <code>Merge</code></td></tr>
+</tbody></table>
+Need a specialized helper? Import it from the same package:</p><pre><code>import {
   createOfflineDB,
   createAuthTransport,
   createSQLiteStorage,
@@ -61,5 +67,6 @@ const unsubscribe = users.subscribe((records) =&gt; {});</code></pre><h2>Events<
       </footer>
     </div>
     <script src="assets/site.js"></script>
+    
   </body>
 </html>

@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/styles.css" />
+    
   </head>
   <body>
     <div class="site-shell">
@@ -18,13 +19,13 @@
           <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
             <span class="nav-toggle-bars" aria-hidden="true"></span>
           </button>
-          <nav class="nav" id="site-nav" aria-label="Primary"><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html" aria-current="page">FAQ</a></nav>
+          <nav class="nav" id="site-nav" aria-label="Primary"><a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="faq.html" aria-current="page">FAQ</a></nav>
         </div>
       </header>
       
     <div class="page doc-layout">
       <aside class="sidebar reveal" aria-label="Documentation">
-        <a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html" aria-current="page">FAQ</a>
+        <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html">Roadmap</a><a href="faq.html" aria-current="page">FAQ</a>
       </aside>
       <article class="content reveal">
         <h1>FAQ</h1><h2>Does core depend on React, Vue, Svelte, or Next.js?</h2><p>No. <code>@offlinejs/core</code> is framework agnostic.</p><h2>Can I use Axios?</h2><p>Yes. Implement <code>SyncTransport</code> and pass it as <code>transport</code>.</p><h2>Does optimistic update wait for the network?</h2><p>No. Local storage updates first, then the mutation is queued and synced when possible.</p><h2>What happens when sync fails?</h2><p>The mutation remains queued, receives retry metadata, and is retried with exponential backoff.</p><h2>How are conflicts resolved?</h2><p>Use <code>clientWins</code>, <code>serverWins</code>, <code>lastWriteWins</code>, <code>merge</code>, or a custom resolver.
@@ -39,5 +40,6 @@
       </footer>
     </div>
     <script src="assets/site.js"></script>
+    
   </body>
 </html>

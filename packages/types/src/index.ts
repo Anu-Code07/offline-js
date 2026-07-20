@@ -189,8 +189,18 @@ export interface TransportOptions {
   timeoutMs?: number;
 }
 
+/** Named built-in conflict strategies for better DX than raw strings. */
+export enum ConflictStrategyName {
+  ClientWins = "clientWins",
+  ServerWins = "serverWins",
+  LastWriteWins = "lastWriteWins",
+  Merge = "merge"
+}
+
 export type ConflictStrategy<TRecord extends EntityRecord = EntityRecord> =
-  "clientWins" | "serverWins" | "lastWriteWins" | "merge" | ConflictResolver<TRecord>;
+  | ConflictStrategyName
+  | `${ConflictStrategyName}`
+  | ConflictResolver<TRecord>;
 
 export interface ConflictContext<TRecord extends EntityRecord = EntityRecord> {
   client: TRecord | null;

@@ -5,12 +5,12 @@ Offline-first data layer for TypeScript and JavaScript.
 Write to local storage immediately. Sync when the network is back. Retry failed mutations automatically. Resolve conflicts with a strategy you choose.
 
 ```ts
-import { createOfflineDB } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: "indexeddb",
-  sync: { conflictStrategy: "lastWriteWins" }
+  storage: OfflineStorage.IndexedDB,
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 
 const todos = db.collection("todos");
@@ -57,19 +57,19 @@ type AppData = {
 ### 2. Create the database
 
 ```ts
-import { createOfflineDB } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB<AppData>({
   baseURL: "https://api.example.com",
-  storage: "indexeddb", // or "memory" | "opfs" | a custom adapter
+  storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS | adapter
   sync: {
     autoStart: true,
-    conflictStrategy: "lastWriteWins"
+    conflictStrategy: ConflictStrategyName.LastWriteWins
   }
 });
 ```
 
-If you omit `storage`, OfflineJS uses IndexedDB in the browser and memory in Node.
+If you omit `storage`, OfflineJS uses `OfflineStorage.IndexedDB` in the browser and `OfflineStorage.Memory` in Node.
 
 ### 3. Read and write through collections
 
@@ -183,8 +183,10 @@ db.on("error", (error) => {
 Built-in options: `clientWins`, `serverWins`, `lastWriteWins`, `merge`, or a custom resolver.
 
 ```ts
+import { createOfflineDB, OfflineStorage } from "@offlinejs";
+
 const db = createOfflineDB({
-  storage: "indexeddb",
+  storage: OfflineStorage.IndexedDB,
   sync: {
     conflictStrategy: async ({ client, server }) => ({
       ...server,
@@ -198,10 +200,10 @@ const db = createOfflineDB({
 ### Use memory storage in tests or Node
 
 ```ts
-import { createOfflineDB } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB({
-  storage: "memory",
+  storage: OfflineStorage.Memory,
   sync: { enabled: false }
 });
 
@@ -257,7 +259,7 @@ Common plugin use cases: auth headers, logging, validation, encryption, analytic
 Use this when your backend does not match the default fetch paths.
 
 ```ts
-import { createOfflineDB, type SyncTransport } from "@offlinejs";
+import { createOfflineDB, OfflineStorage, type SyncTransport } from "@offlinejs";
 
 const transport: SyncTransport = {
   async request(request) {
@@ -275,7 +277,7 @@ const transport: SyncTransport = {
 };
 
 const db = createOfflineDB({
-  storage: "indexeddb",
+  storage: OfflineStorage.IndexedDB,
   transport
 });
 ```

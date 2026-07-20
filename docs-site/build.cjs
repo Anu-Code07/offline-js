@@ -13,6 +13,7 @@ const assets = join(root, "assets");
 
 const pages = [
   ["index", null, "Home", "home"],
+  ["demo", null, "Demo", "demo"],
   ["quick-start", "docs/api-reference.md", "Quick Start", "docs"],
   ["api", "docs/api-reference.md", "API", "docs"],
   ["architecture", "docs/architecture.md", "Architecture", "docs"],
@@ -36,9 +37,10 @@ function main() {
   cpSync(assets, join(output, "assets"), { recursive: true });
 
   writeFileSync(join(output, "index.html"), renderHome(), "utf8");
+  writeFileSync(join(output, "demo.html"), renderDemo(), "utf8");
 
   for (const [slug, source, title] of pages) {
-    if (slug === "index") {
+    if (slug === "index" || slug === "demo") {
       continue;
     }
 
@@ -54,12 +56,12 @@ pnpm add @offlinejs
 \`\`\`
 
 \`\`\`ts
-import { createOfflineDB } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: "indexeddb",
-  sync: { conflictStrategy: "lastWriteWins" }
+  storage: OfflineStorage.IndexedDB,
+  sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
 });
 
 const todos = db.collection("todos");
@@ -67,7 +69,7 @@ await todos.create({ title: "Ship offline sync", completed: false });
 const open = await todos.find({ filters: { completed: false } });
 \`\`\`
 
-One package covers the common path. Need something specific? Import it from \`@offlinejs\` too, or from a focused package like \`@offlinejs/storage-sqlite\`.
+One package covers the common path. Prefer enums like \`OfflineStorage.IndexedDB\` over raw strings. Need something specific? Import it from \`@offlinejs\` too, or from a focused package like \`@offlinejs/storage-sqlite\`.
 
 ## What happens next
 
@@ -119,9 +121,9 @@ function assertExists(path, label) {
   }
 }
 
-function shell({ title, current, body }) {
+function shell({ title, current, body, head = "", scripts = "" }) {
   const nav = navPages
-    .slice(0, 7)
+    .slice(0, 8)
     .map(
       ([slug, , label]) =>
         `<a href="${slug}.html"${current === slug ? ' aria-current="page"' : ""}>${escapeHtml(label)}</a>`
@@ -139,6 +141,7 @@ function shell({ title, current, body }) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/styles.css" />
+    ${head}
   </head>
   <body>
     <div class="site-shell">
@@ -159,6 +162,7 @@ function shell({ title, current, body }) {
       </footer>
     </div>
     <script src="assets/site.js"></script>
+    ${scripts}
   </body>
 </html>`;
 }
@@ -177,8 +181,8 @@ function renderHome() {
           The offline-first data layer for TypeScript apps that should keep working when the network disappears.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="quick-start.html">Start building</a>
-          <a class="button button-secondary" href="api.html">Read the API</a>
+          <a class="button button-primary" href="demo.html">Try the live demo</a>
+          <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
     </section>
@@ -214,11 +218,11 @@ function renderHome() {
         <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs
 
-import { createOfflineDB } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
-  storage: "indexeddb"
+  storage: OfflineStorage.IndexedDB
 });
 
 await db.collection("todos").create({ title: "Works offline" });</code></pre>
@@ -241,6 +245,73 @@ await db.collection("todos").create({ title: "Works offline" });</code></pre>
   `;
 
   return shell({ title: "Offline-first data layer", current: "index", body });
+}
+
+function renderDemo() {
+  const body = `
+    <main class="demo-page">
+      <section class="demo-hero">
+        <h1>Live offline sync demo</h1>
+        <p>
+          A tiny todos app on IndexedDB with a fake API that generates random data.
+          Toggle offline, queue writes, sync, and resolve conflicts — with the real
+          <code>@offlinejs/devtools</code> + <code>@offlinejs/devtools-ui</code> packages mounted below.
+        </p>
+      </section>
+
+      <p class="demo-status" id="demo-status">Starting demo…</p>
+
+      <section class="demo-toolbar" aria-label="Demo controls">
+        <label class="demo-toggle">
+          <input id="online-toggle" type="checkbox" checked />
+          <span id="online-label">Online</span>
+        </label>
+
+        <label class="demo-field">
+          Conflict strategy
+          <select id="conflict-strategy">
+            <option value="lastWriteWins">ConflictStrategyName.LastWriteWins</option>
+            <option value="clientWins">ConflictStrategyName.ClientWins</option>
+            <option value="serverWins">ConflictStrategyName.ServerWins</option>
+            <option value="merge">ConflictStrategyName.Merge</option>
+          </select>
+        </label>
+
+        <button class="button button-secondary" type="button" id="seed-random">Seed random API data</button>
+        <button class="button button-primary" type="button" id="sync-now">Sync now</button>
+        <button class="button button-secondary" type="button" id="simulate-conflict">Simulate conflict</button>
+        <button class="button button-secondary" type="button" id="reset-demo">Reset</button>
+      </section>
+
+      <section class="demo-composer" aria-label="Add todo">
+        <input id="todo-title" type="text" placeholder="Add a todo…" />
+        <button class="button button-primary" type="button" id="add-todo">Add locally</button>
+      </section>
+
+      <div class="demo-layout">
+        <section class="demo-panel">
+          <h2>Local collection</h2>
+          <p class="demo-meta" id="queue-meta">Loading local todos…</p>
+          <p class="demo-meta" id="server-meta">Fake API idle.</p>
+          <ul class="demo-list" id="todo-list"></ul>
+        </section>
+
+        <section class="demo-panel">
+          <h2>Package Devtools</h2>
+          <p class="demo-meta">Live timeline from <code>createDevtoolsController(db).mount()</code>.</p>
+          <div class="demo-devtools" id="offlinejs-devtools"></div>
+        </section>
+      </div>
+    </main>
+  `;
+
+  return shell({
+    title: "Live demo",
+    current: "demo",
+    body,
+    head: '<link rel="stylesheet" href="assets/demo.css" />',
+    scripts: '<script type="module" src="assets/demo.js"></script>'
+  });
 }
 
 function renderDoc(title, markdown, slug) {
