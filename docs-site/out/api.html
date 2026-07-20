@@ -31,7 +31,8 @@
         <a href="demo.html">Demo</a><a href="quick-start.html">Quick Start</a><a href="api.html" aria-current="page">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="ai.html">AI.md</a><a href="cache.html">Cache</a><a href="benchmarks.html">Benchmarks</a><a href="performance.html">Performance</a><a href="practices.html">Best practices</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs/client</code></pre><p>One package covers the common path. Prefer enums (<code>OfflineStorage</code>, <code>ConflictStrategyName</code>) over raw strings. Import a focused <code>@offlinejs/*</code> package only when you need a smaller bundle.</p><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database.</p><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;
+        <h1>API Reference</h1><h2>Install</h2><pre><code>pnpm add @offlinejs/client
+# npm i @offlinejs/client</code></pre><p>Published on npm as <a href="https://www.npmjs.com/package/@offlinejs/client"><code>@offlinejs/client</code></a> (latest <strong>0.1.2</strong>). One package covers the common path — offline DB, storage presets, plugins, React hooks, and HTTP cache helpers. Prefer enums (<code>OfflineStorage</code>, <code>ConflictStrategyName</code>) over raw strings. Import a focused <code>@offlinejs/*</code> package only when you need a smaller bundle.</p><h2><code>createOfflineDB(options)</code></h2><p>Creates a framework-agnostic offline database.</p><pre><code>import { ConflictStrategyName, createOfflineDB, OfflineStorage } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
@@ -126,7 +127,14 @@ const db = createOfflineDB({
   }
 });
 
-db.use(analytics());</code></pre><p>See <a href="plugins.html">Plugins</a> for the full guide and <a href="ai.html">AI.md</a> for copy-paste implementation prompts aimed at AI editors.</p><h2>React</h2><pre><code>import { OfflineProvider, useOfflineCollection, useOfflineStatus } from &quot;@offlinejs/client&quot;;</code></pre><p>Wrap your tree in <code>OfflineProvider</code> with a <code>db</code> instance, then use <code>useOfflineCollection(&quot;todos&quot;)</code> and <code>useOfflineStatus()</code> in components.</p><h2>Storage adapters</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Adapter</th><th>Import</th><th>Notes</th></tr></thead><tbody><tr><td>Memory</td><td><code>OfflineStorage.Memory</code> / <code>createMemoryStorage()</code></td><td>Fast, non-durable — tests &amp; SSR</td></tr><tr><td>IndexedDB</td><td><code>OfflineStorage.IndexedDB</code> / <code>createIndexedDBStorage()</code></td><td>Default browser durable store; supports <code>setMany</code></td></tr><tr><td>OPFS</td><td><code>OfflineStorage.OPFS</code> / <code>createOPFSStorage()</code></td><td>Origin Private File System</td></tr><tr><td>SQLite</td><td><code>createSQLiteStorage({ driver })</code></td><td>SQL pushdown; Node via <code>createBetterSqlite3DriverAsync</code></td></tr></tbody></table></div><h2>Next steps</h2><ul><li><a href="demo.html">Live demo</a> — device → outbox → remote with DevTools</li>
+db.use(analytics());</code></pre><p>See <a href="plugins.html">Plugins</a> for the full guide and <a href="ai.html">AI.md</a> for copy-paste implementation prompts aimed at AI editors.</p><h2>React</h2><pre><code>import { OfflineProvider, useOfflineCollection, useOfflineStatus } from &quot;@offlinejs/client&quot;;</code></pre><p>Wrap your tree in <code>OfflineProvider</code> with a <code>db</code> instance, then use <code>useOfflineCollection(&quot;todos&quot;)</code> and <code>useOfflineStatus()</code> in components.</p><h2>Storage adapters</h2><div class="table-wrap"><table class="data-table"><thead><tr><th>Adapter</th><th>Import</th><th>Notes</th></tr></thead><tbody><tr><td>Memory</td><td><code>OfflineStorage.Memory</code> / <code>createMemoryStorage()</code></td><td>Fast, non-durable — tests &amp; SSR</td></tr><tr><td>IndexedDB</td><td><code>OfflineStorage.IndexedDB</code> / <code>createIndexedDBStorage()</code></td><td>Default browser durable store; supports <code>setMany</code></td></tr><tr><td>OPFS</td><td><code>OfflineStorage.OPFS</code> / <code>createOPFSStorage()</code></td><td>Origin Private File System</td></tr><tr><td>SQLite</td><td><code>createSQLiteStorage({ driver })</code></td><td>SQL pushdown; Node via <code>createBetterSqlite3DriverAsync</code></td></tr></tbody></table></div><h2>HTTP cache</h2><p>For TTL / stale-while-revalidate <strong>GET caching</strong> (not the offline outbox), use helpers from <code>@offlinejs/client</code> or <a href="https://www.npmjs.com/package/@offlinejs/http-cache"><code>@offlinejs/http-cache</code></a>:</p><pre><code>import { cachedJson, createIndexedDBHttpCache } from &quot;@offlinejs/client&quot;;
+
+const store = createIndexedDBHttpCache();
+const { data, fromCache } = await cachedJson(&quot;/api/catalog&quot;, undefined, {
+  store,
+  ttlMs: 60_000,
+  staleWhileRevalidateMs: 30_000
+});</code></pre><p>See <a href="cache.html">HTTP cache</a> for stores, invalidation, and when to use OfflineDB vs <code>cachedJson</code>.</p><h2>Next steps</h2><ul><li><a href="demo.html">Live demo</a> — device → outbox → remote with DevTools</li>
 <li><a href="plugins.html">Plugins</a> — deeper plugin APIs</li>
 <li><a href="cache.html">HTTP cache</a> — TTL GET/JSON caching (<code>cachedJson</code>)</li>
 <li><a href="ai.html">AI.md</a> — paste into Cursor / Copilot / ChatGPT to implement OfflineJS</li>
@@ -149,8 +157,9 @@ db.use(analytics());</code></pre><p>See <a href="plugins.html">Plugins</a> for t
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
             <a href="plugins.html">Plugins</a>
+            <a href="cache.html">HTTP cache</a>
             <a href="ai.html">AI.md</a>
-            <a href="benchmarks.html">Benchmarks</a>
+            <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
           </div>
         </div>
       </footer>

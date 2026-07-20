@@ -52,10 +52,11 @@ function main() {
     if (slug === "quick-start") {
       markdown = `# Quick Start
 
-Install OfflineJS and start writing local-first data in minutes.
+Install OfflineJS from npm and start writing local-first data in minutes.
 
 \`\`\`bash
 pnpm add @offlinejs/client
+# npm i @offlinejs/client
 \`\`\`
 
 \`\`\`ts
@@ -193,8 +194,9 @@ function shell({ title, current, body, head = "", scripts = "" }) {
             <a href="demo.html">Live demo</a>
             <a href="quick-start.html">Quick start</a>
             <a href="plugins.html">Plugins</a>
+            <a href="cache.html">HTTP cache</a>
             <a href="ai.html">AI.md</a>
-            <a href="benchmarks.html">Benchmarks</a>
+            <a href="https://www.npmjs.com/package/@offlinejs/client" rel="noopener">npm</a>
           </div>
         </div>
       </footer>
@@ -463,9 +465,10 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
     <section class="section section-install">
       <div class="section-inner">
         <p class="section-kicker reveal">Install</p>
-        <h2 class="section-title reveal">One package for the common path.</h2>
+        <h2 class="section-title reveal">One package on npm.</h2>
         <p class="section-copy reveal">
-          Install <code>@offlinejs/client</code>. Prefer storage and conflict enums. Sync rides along.
+          <code>pnpm add @offlinejs/client</code> — offline DB, sync, plugins, and HTTP cache helpers.
+          Also: <a href="https://www.npmjs.com/package/@offlinejs/client">npmjs.com/package/@offlinejs/client</a>
         </p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
 
@@ -480,6 +483,7 @@ const db = createOfflineDB({
 await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
         <div class="cta-row reveal" style="margin-top: 1.5rem">
           <a class="button button-primary" href="quick-start.html">Quick start guide</a>
+          <a class="button button-secondary" href="cache.html">HTTP cache</a>
           <a class="button button-secondary" href="api.html">API reference</a>
         </div>
       </div>
