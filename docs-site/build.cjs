@@ -142,7 +142,10 @@ function shell({ title, current, body, head = "", scripts = "" }) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="OfflineJS — offline-first data layer for TypeScript and JavaScript." />
+    <meta
+      name="description"
+      content="OfflineJS — write locally, sync automatically, recover gracefully. The TypeScript offline-first data layer with a durable outbox and conflict strategies you choose."
+    />
     <title>${escapeHtml(title)} · OfflineJS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -163,8 +166,21 @@ function shell({ title, current, body, head = "", scripts = "" }) {
       </header>
       ${body}
       <footer class="footer">
-        <div class="section-inner">
-          OfflineJS keeps apps writing locally, syncing automatically, and recovering gracefully.
+        <div class="section-inner footer-inner">
+          <div class="footer-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <strong>OfflineJS</strong>
+          </div>
+          <p class="footer-copy">
+            Write locally. Sync when the network returns. Choose how conflicts resolve —
+            with a sync pipeline you can see.
+          </p>
+          <div class="footer-links">
+            <a href="demo.html">Live demo</a>
+            <a href="quick-start.html">Quick start</a>
+            <a href="architecture.html">Architecture</a>
+            <a href="benchmarks.html">Benchmarks</a>
+          </div>
         </div>
       </footer>
     </div>
@@ -281,10 +297,11 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
       : `
     <section class="section bench-landing" aria-label="Benchmark scores">
       <div class="section-inner">
-        <p class="section-kicker reveal">Benchmarks</p>
+        <p class="section-kicker reveal">Proof</p>
         <h2 class="section-title reveal">Measured on real adapters.</h2>
         <p class="section-copy reveal">
-          ${highlights.datasetSize.toLocaleString()}-record suite against memory, IndexedDB, and SQLite — not synthetic demos.
+          ${highlights.datasetSize.toLocaleString()}-record suite against memory, IndexedDB, and SQLite.
+          Reproduce anytime with <code>pnpm bench</code>.
         </p>
         <div class="bench-strip">
           ${highlights.items
@@ -300,7 +317,7 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
         </div>
         <div class="cta-row reveal">
           <a class="button button-primary" href="benchmarks.html">See full scores</a>
-          <a class="button button-secondary" href="demo.html">Watch the sync pipeline</a>
+          <a class="button button-secondary" href="performance.html">How we stay fast</a>
         </div>
       </div>
     </section>`;
@@ -308,77 +325,131 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
   const body = `
     <section class="hero">
       <div class="hero-visual" aria-hidden="true">
-        <div class="orbit orbit-1"><span class="node"></span></div>
-        <div class="orbit orbit-2"><span class="node"></span></div>
-        <div class="orbit orbit-3"><span class="node"></span></div>
+        <div class="hero-glow hero-glow-a"></div>
+        <div class="hero-glow hero-glow-b"></div>
+        <div class="hero-pipeline">
+          <div class="hero-pipe-stage" data-stage="device">
+            <span class="hero-pipe-label">Device</span>
+            <span class="hero-pipe-detail">IndexedDB</span>
+          </div>
+          <div class="hero-pipe-link">
+            <span class="hero-pipe-pulse"></span>
+          </div>
+          <div class="hero-pipe-stage" data-stage="outbox">
+            <span class="hero-pipe-label">Outbox</span>
+            <span class="hero-pipe-detail">durable queue</span>
+          </div>
+          <div class="hero-pipe-link">
+            <span class="hero-pipe-pulse"></span>
+          </div>
+          <div class="hero-pipe-stage" data-stage="remote">
+            <span class="hero-pipe-label">Remote</span>
+            <span class="hero-pipe-detail">when online</span>
+          </div>
+        </div>
       </div>
       <div class="hero-inner">
-        <h1 class="brand-hero reveal">OfflineJS</h1>
+        <p class="brand-hero reveal">OfflineJS</p>
+        <h1 class="hero-headline reveal">Keep writing when the network doesn’t.</h1>
         <p class="hero-copy reveal">
-          The TypeScript offline-first data layer: local writes, a durable sync outbox, conflict strategies you choose — one import to start.
+          Local writes, a durable sync outbox, and conflict strategies you choose —
+          one TypeScript import to start.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="demo.html">Watch the sync pipeline</a>
+          <a class="button button-primary" href="demo.html">Try the live demo</a>
           <a class="button button-secondary" href="quick-start.html">Start building</a>
         </div>
       </div>
     </section>
 
-    ${benchSection}
+    <section class="section section-outcome">
+      <div class="section-inner">
+        <p class="section-kicker reveal">The outcome</p>
+        <h2 class="section-title reveal">Apps that feel online — even when they aren’t.</h2>
+        <p class="section-copy reveal">
+          Users tap, edit, and save without waiting on connectivity. OfflineJS persists
+          every mutation locally, flushes the outbox when the link returns, and resolves
+          conflicts with the strategy you pick — not a silent merge you can’t audit.
+        </p>
+      </div>
+    </section>
+
+    <section class="section section-flow">
+      <div class="section-inner">
+        <p class="section-kicker reveal">How it works</p>
+        <h2 class="section-title reveal">Three stages. Always visible.</h2>
+        <p class="section-copy reveal">
+          The same device → outbox → remote path powers production apps and the live demo.
+        </p>
+        <ol class="flow-strip">
+          <li class="flow-step reveal">
+            <span class="flow-num">01</span>
+            <h3>Write on device</h3>
+            <p>Collections update IndexedDB (or SQLite) immediately so the UI never stalls.</p>
+          </li>
+          <li class="flow-step reveal">
+            <span class="flow-num">02</span>
+            <h3>Queue mutations</h3>
+            <p>A durable outbox holds creates, updates, and deletes until sync can push them.</p>
+          </li>
+          <li class="flow-step reveal">
+            <span class="flow-num">03</span>
+            <h3>Sync &amp; resolve</h3>
+            <p>Reconnect flushes batches; last-write-wins, client/server wins, or merge — your call.</p>
+          </li>
+        </ol>
+        <div class="cta-row reveal">
+          <a class="button button-primary" href="demo.html">Watch it live</a>
+          <a class="button button-secondary" href="sync.html">Sync engine docs</a>
+        </div>
+      </div>
+    </section>
 
     <section class="section">
       <div class="section-inner">
         <p class="section-kicker reveal">Why OfflineJS</p>
-        <h2 class="section-title reveal">Reliability you can see. Speed where it counts.</h2>
+        <h2 class="section-title reveal">Reliability you can see. DX that stays calm.</h2>
         <p class="section-copy reveal">
-          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic. OfflineJS turns that into a calm collection API — with a live stock demo and Redux-style DevTools so the outbox is never a black box.
+          Stop hand-rolling IndexedDB wrappers, mutation queues, retries, and conflict logic.
+          Get a collection API, a stock demo that shows the pipeline, and Redux-style DevTools
+          so the outbox is never a black box.
         </p>
         <div class="feature-strip">
           <article class="feature reveal">
             <h3>Optimistic by default</h3>
-            <p>UI updates immediately from durable local storage while mutations wait for reconnect.</p>
+            <p>UI updates from durable local storage while mutations wait for reconnect.</p>
           </article>
           <article class="feature reveal">
-            <h3>Batched durable writes</h3>
-            <p><code>setMany</code> lands many records in one IndexedDB/SQLite transaction — built for real ingest, not toy loops.</p>
-          </article>
-          <article class="feature reveal">
-            <h3>Lean sync path</h3>
-            <p>Status-filtered outbox reads, concurrent push batches, and engine pushdown for equality queries.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-inner">
-        <p class="section-kicker reveal">Product</p>
-        <h2 class="section-title reveal">Market the outcome — prove the engine.</h2>
-        <p class="section-copy reveal">
-          Lead with offline UX and DX. Use measured adapter scores as proof, not hype. Reproduce anytime with <code>pnpm bench</code>.
-        </p>
-        <div class="feature-strip">
-          <article class="feature reveal">
-            <h3>One install</h3>
+            <h3>One package path</h3>
             <p><code>@offlinejs/client</code> covers createOfflineDB, storage presets, React hooks, and common plugins.</p>
           </article>
           <article class="feature reveal">
             <h3>Visible trust</h3>
-            <p>Device → outbox → remote demo plus floating DevTools (Ctrl/⌘+Shift+O).</p>
+            <p>Live pipeline demo plus floating DevTools — open with Ctrl/⌘+Shift+O.</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Batched durable writes</h3>
+            <p><code>setMany</code> lands many records in one IndexedDB/SQLite transaction.</p>
+          </article>
+          <article class="feature reveal">
+            <h3>Lean sync path</h3>
+            <p>Status-filtered outbox reads, concurrent push batches, and query pushdown.</p>
           </article>
           <article class="feature reveal">
             <h3>Honest metrics</h3>
-            <p>Write throughput, find latency, indexed lookup — documented methodology on the benchmarks page.</p>
+            <p>Write throughput and find latency — documented methodology, not marketing fluff.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section">
+    <section class="section section-install">
       <div class="section-inner">
         <p class="section-kicker reveal">Install</p>
         <h2 class="section-title reveal">One package for the common path.</h2>
-        <p class="section-copy reveal">Install <code>@offlinejs/client</code>. Prefer storage and conflict enums. Sync rides along.</p>
+        <p class="section-copy reveal">
+          Install <code>@offlinejs/client</code>. Prefer storage and conflict enums. Sync rides along.
+        </p>
         <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
 
 import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
@@ -390,19 +461,27 @@ const db = createOfflineDB({
 });
 
 await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
+        <div class="cta-row reveal" style="margin-top: 1.5rem">
+          <a class="button button-primary" href="quick-start.html">Quick start guide</a>
+          <a class="button button-secondary" href="api.html">API reference</a>
+        </div>
       </div>
     </section>
 
-    <section class="section">
+    ${benchSection}
+
+    <section class="section section-cta">
       <div class="section-inner">
-        <p class="section-kicker reveal">Docs</p>
+        <p class="section-kicker reveal">Keep going</p>
         <h2 class="section-title reveal">Explore the system.</h2>
-        <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, DevTools, contracts, and the completed v0.2–v0.8 foundations.</p>
+        <p class="section-copy reveal">
+          Architecture, adapters, sync, plugins, DevTools, contracts, and the completed v0.2–v0.8 foundations.
+        </p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
-          <a class="button button-secondary" href="performance.html">Performance</a>
-          <a class="button button-secondary" href="benchmarks.html">Benchmarks</a>
+          <a class="button button-secondary" href="storage.html">Storage</a>
           <a class="button button-secondary" href="plugins.html">DevTools</a>
+          <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>
     </section>
@@ -415,12 +494,13 @@ function renderDemo() {
   const body = `
     <main class="demo-page">
       <section class="demo-hero">
-        <h1>Watch the sync pipeline</h1>
+        <p class="section-kicker">Live demo</p>
+        <h1>Watch OfflineJS sync in real time</h1>
         <p>
-          A warehouse stock board that makes OfflineJS visible: edit quantities on
-          <strong>this device</strong>, see writes land in the <strong>outbox</strong>,
-          then flush to the <strong>remote API</strong>. Cut the link, diverge quantities,
-          and resolve conflicts — with real <code>@offlinejs/devtools</code> events below.
+          Edit warehouse stock on <strong>this device</strong>, see writes land in the
+          <strong>outbox</strong>, then flush to the <strong>remote API</strong>.
+          Cut the link, diverge quantities, and resolve conflicts — with real
+          <code>@offlinejs/devtools</code> events below.
         </p>
       </section>
 
