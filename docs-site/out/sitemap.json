@@ -55,19 +55,9 @@
     "url": "/performance.html"
   },
   {
-    "slug": "contracts",
-    "title": "Contracts",
-    "url": "/contracts.html"
-  },
-  {
     "slug": "practices",
-    "title": "Practices",
+    "title": "Best practices",
     "url": "/practices.html"
-  },
-  {
-    "slug": "roadmap",
-    "title": "Roadmap",
-    "url": "/roadmap.html"
   },
   {
     "slug": "faq",

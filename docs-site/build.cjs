@@ -24,9 +24,7 @@ const pages = [
   ["ai", "docs/ai.md", "AI.md", "docs"],
   ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["performance", "docs/performance.md", "Performance", "docs"],
-  ["contracts", "docs/public-contracts.md", "Contracts", "docs"],
-  ["practices", "docs/best-practices.md", "Practices", "docs"],
-  ["roadmap", "docs/roadmap-implementation.md", "Roadmap", "docs"],
+  ["practices", "docs/best-practices.md", "Best practices", "docs"],
   ["faq", "docs/faq.md", "FAQ", "docs"]
 ];
 
@@ -94,7 +92,7 @@ The [live demo](demo.html) uses a warehouse stock board — device → outbox �
 - [Storage Adapters](storage.html)
 - [Sync Engine](sync.html)
 - [Plugins](plugins.html)
-- [Roadmap](roadmap.html)
+- [Best practices](practices.html)
 `;
     }
 
@@ -313,7 +311,7 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
       : `
     <section class="section bench-landing" aria-label="Benchmark scores">
       <div class="section-inner">
-        <p class="section-kicker reveal">Proof</p>
+        <p class="section-kicker reveal">Performance</p>
         <h2 class="section-title reveal">Measured on real adapters.</h2>
         <p class="section-copy reveal">
           ${highlights.datasetSize.toLocaleString()}-record suite against memory, IndexedDB, and SQLite.
@@ -442,8 +440,8 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
             <p><code>@offlinejs/client</code> covers createOfflineDB, storage presets, React hooks, and common plugins.</p>
           </article>
           <article class="feature reveal">
-            <h3>Visible trust</h3>
-            <p>Live pipeline demo plus floating DevTools — open with Ctrl/⌘+Shift+O.</p>
+            <h3>Sync you can inspect</h3>
+            <p>Live device → outbox → remote demo, plus DevTools (Ctrl/⌘+Shift+O).</p>
           </article>
           <article class="feature reveal">
             <h3>Batched durable writes</h3>
@@ -454,8 +452,8 @@ function renderHome(highlights = { datasetSize: 10_000, items: [] }) {
             <p>Status-filtered outbox reads, concurrent push batches, and query pushdown.</p>
           </article>
           <article class="feature reveal">
-            <h3>Honest metrics</h3>
-            <p>Write throughput and find latency — documented methodology, not marketing fluff.</p>
+            <h3>Conflict strategies</h3>
+            <p>Last-write-wins, client/server wins, or merge — pick the policy your product needs.</p>
           </article>
         </div>
       </div>
@@ -490,16 +488,16 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
 
     <section class="section section-cta">
       <div class="section-inner">
-        <p class="section-kicker reveal">Keep going</p>
-        <h2 class="section-title reveal">Explore the system.</h2>
+        <p class="section-kicker reveal">Docs</p>
+        <h2 class="section-title reveal">Build with OfflineJS.</h2>
         <p class="section-copy reveal">
-          Architecture, adapters, sync, plugins, DevTools, contracts, and the completed v0.2–v0.8 foundations.
+          Architecture, storage adapters, sync, plugins, and best practices — everything you need to ship offline-first.
         </p>
         <div class="cta-row reveal">
-          <a class="button button-primary" href="architecture.html">Architecture</a>
+          <a class="button button-primary" href="quick-start.html">Quick start</a>
+          <a class="button button-secondary" href="api.html">API</a>
           <a class="button button-secondary" href="plugins.html">Plugins</a>
-          <a class="button button-secondary" href="ai.html">AI.md</a>
-          <a class="button button-secondary" href="roadmap.html">Roadmap</a>
+          <a class="button button-secondary" href="demo.html">Live demo</a>
         </div>
       </div>
     </section>

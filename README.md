@@ -429,8 +429,7 @@ const db = createOfflineDB({
 });
 ```
 
-Full version map (v0.2–v0.8), React/Next/worker examples, and install sets:
-[docs/roadmap-implementation.md](./docs/roadmap-implementation.md).
+See [docs/](./docs/) for architecture, storage, sync, plugins, and best practices. Contributor notes live in [`docs/roadmap-implementation.md`](./docs/roadmap-implementation.md) and [`docs/public-contracts.md`](./docs/public-contracts.md).
 
 ## Tips for production apps
 
