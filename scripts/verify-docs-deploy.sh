@@ -6,7 +6,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
 echo "-> Regenerating docs-site/out"
-node docs-site/build.cjs
+pnpm docs:build
 
 echo "-> Checking required artifacts"
 test -f docs-site/out/index.html
