@@ -363,11 +363,12 @@ await db.collection("stock").create({ name: "Oat milk", qty: 12 });</code></pre>
       <div class="section-inner">
         <p class="section-kicker reveal">Docs</p>
         <h2 class="section-title reveal">Explore the system.</h2>
-        <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, contracts, and the completed v0.2–v0.8 foundations.</p>
+        <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, DevTools, contracts, and the completed v0.2–v0.8 foundations.</p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
           <a class="button button-secondary" href="storage.html">Storage</a>
           <a class="button button-secondary" href="benchmarks.html">Benchmarks</a>
+          <a class="button button-secondary" href="plugins.html">DevTools</a>
           <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>
@@ -458,8 +459,8 @@ function renderDemo() {
       </div>
 
       <section class="demo-panel demo-devtools-wrap">
-        <h2>Package Devtools</h2>
-        <p class="demo-meta">Live timeline from <code>createDevtoolsController(db).mount()</code>.</p>
+        <h2>Package DevTools</h2>
+        <p class="demo-meta">Redux-style Action / State panel from <code>createDevtoolsController(db).mount()</code> — also try <code>openOfflineDevtools(db)</code> for a floating dock.</p>
         <div class="demo-devtools" id="offlinejs-devtools"></div>
       </section>
     </main>

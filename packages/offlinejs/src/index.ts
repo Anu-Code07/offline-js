@@ -108,8 +108,12 @@ export type {
   StorageAdapter,
   SyncTransport
 } from "@offlinejs/core";
+export type {
+  DevtoolsController,
+  DevtoolsEventEntry,
+  DevtoolsUiOptions
+} from "@offlinejs/devtools-ui";
 export type { ConflictStrategy } from "@offlinejs/types";
-export type { DevtoolsController, DevtoolsEventEntry } from "@offlinejs/devtools-ui";
 
 // Storage
 export { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
@@ -180,7 +184,8 @@ export {
   createWorkerSyncRuntime
 } from "@offlinejs/worker-sync";
 export { devtools } from "@offlinejs/devtools";
-export { createDevtoolsController } from "@offlinejs/devtools-ui";
+export type { DevtoolsPluginOptions } from "@offlinejs/devtools";
+export { createDevtoolsController, openOfflineDevtools } from "@offlinejs/devtools-ui";
 export {
   createCacheTagRevalidator,
   createOfflineRouteClient,

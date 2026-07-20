@@ -357,7 +357,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | `@offlinejs/auth` | Auth-aware transport / plugin patterns |
 | `@offlinejs/validation` | Schema validation around storage |
 | `@offlinejs/encryption` | Encrypt records at rest |
-| `@offlinejs/devtools` / `@offlinejs/devtools-ui` | Inspect events while developing |
+| `@offlinejs/devtools` / `@offlinejs/devtools-ui` | Redux-style Action/State DevTools (floating dock or inline) |
 
 ## Docs
 

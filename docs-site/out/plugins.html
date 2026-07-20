@@ -44,16 +44,31 @@ db.use(analytics());</code></pre><p>Good plugin use cases:</p><ul><li>authentica
 <li>schema validation</li>
 <li>devtools</li>
 </ul>
-Plugins receive <code>db</code>, <code>events</code>, <code>network</code>, and <code>storage</code>. They may return a disposer function.</p><h2>Devtools packages</h2><pre><code>import { createOfflineDB, createDevtoolsController, devtools } from &quot;@offlinejs/client&quot;;
+Plugins receive <code>db</code>, <code>events</code>, <code>network</code>, and <code>storage</code>. They may return a disposer function.</p><h2>Devtools packages</h2><p>OfflineJS ships Redux-style developer tools:</p><ul><li><code>@offlinejs/devtools</code> — console logger plugin; optional floating UI via <code>ui: true</code></li>
+<li><code>@offlinejs/devtools-ui</code> — dockable Action / State panel (<code>mount</code>, <code>open</code>, pause/clear/filter)</li>
+</ul>
+<h3>One-liner floating dock (closest to Redux DevTools)</h3><pre><code>import { createOfflineDB, openOfflineDevtools, devtools } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
   storage: &quot;indexeddb&quot;,
-  plugins: [devtools()] // logs sync/queue/network/conflict events
+  plugins: [devtools({ ui: true })] // logs + opens floating dock
+});
+
+// or open manually:
+const panel = openOfflineDevtools(db, { position: &quot;bottom&quot; });
+// Ctrl/⌘ + Shift + O toggles the dock</code></pre><h3>Inline panel (docs / embeds)</h3><pre><code>import { createOfflineDB, createDevtoolsController, devtools } from &quot;@offlinejs/client&quot;;
+
+const db = createOfflineDB({
+  storage: &quot;indexeddb&quot;,
+  plugins: [devtools()]
 });
 
 const panel = createDevtoolsController(db);
-panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><ul><li><code>@offlinejs/devtools</code> — console event plugin</li>
-<li><code>@offlinejs/devtools-ui</code> — live DOM timeline (<code>mount</code> / <code>render</code>)</li>
+panel.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><p>The panel shows:</p><ul><li>live <strong>Action</strong> log (<code>queue:*</code>, <code>sync:*</code>, network, conflicts, errors…)</li>
+<li>filter chips + search</li>
+<li>pause / resume / clear</li>
+<li><strong>State / Outbox</strong> tab (when storage is available)</li>
+<li>floating dock (<code>open()</code>) or inline <code>mount(target)</code></li>
 </ul>
 See the interactive showcase at <code>/demo</code>.
 </p>

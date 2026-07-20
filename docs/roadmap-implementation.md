@@ -142,13 +142,20 @@ export function App({ db, todos }) {
 }
 ```
 
-### Devtools timeline
+### DevTools (Redux-style)
 
 ```ts
-import { createDevtoolsController } from "@offlinejs/devtools-ui";
+import { createDevtoolsController, openOfflineDevtools, devtools } from "@offlinejs/client";
 
-const devtools = createDevtoolsController(db);
-devtools.mount(document.getElementById("offlinejs-devtools"));
+// Floating dock (Ctrl/⌘ + Shift + O)
+openOfflineDevtools(db, { position: "bottom" });
+
+// Or auto-open via plugin:
+createOfflineDB({ plugins: [devtools({ ui: true })] });
+
+// Inline embed:
+const panel = createDevtoolsController(db);
+panel.mount(document.getElementById("offlinejs-devtools"));
 ```
 
 ### Worker-based sync

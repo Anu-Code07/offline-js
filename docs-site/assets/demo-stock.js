@@ -93,10 +93,14 @@ var matchesQuery = (record, query = {}) => {
   );
 };
 var applyQuery = (records, query = {}) => {
-  const filtered = records.filter((record) => matchesQuery(record, query));
+  const needsFilter = Boolean(query.filters) || Boolean(query.search);
+  const filtered = needsFilter ? records.filter((record) => matchesQuery(record, query)) : records;
   const sorted = sortRecords(filtered, query);
   const offset = Math.max(0, query.offset ?? 0);
-  const limit = query.limit ?? sorted.length;
+  const limit = query.limit ?? Math.max(0, sorted.length - offset);
+  if (offset === 0 && limit >= sorted.length) {
+    return sorted === records ? records.slice() : sorted;
+  }
   return sorted.slice(offset, offset + limit);
 };
 var countQuery = (records, query = {}) => records.filter((record) => matchesQuery(record, query)).length;
@@ -126,25 +130,43 @@ var findMatchingIndex = (indexes, lookups) => {
     return null;
   }
   const lookupByField = new Map(lookups.map((lookup) => [lookup.field, lookup.value]));
-  const ranked = [...indexes].sort((left, right) => right.fields.length - left.fields.length);
-  for (const index of ranked) {
+  let best = null;
+  for (const index of indexes) {
     const fields = index.fields.map(String);
-    if (fields.every((field) => lookupByField.has(field))) {
-      return {
+    if (!fields.every((field) => lookupByField.has(field))) {
+      continue;
+    }
+    if (!best || fields.length > best.index.fields.length) {
+      best = {
         index,
         values: fields.map((field) => lookupByField.get(field))
       };
     }
   }
-  return null;
+  return best;
 };
+var indexSatisfiesQuery = (match, query) => {
+  if (!query || query.search || query.orderBy) {
+    return false;
+  }
+  const filterKeys = query.filters ? Object.keys(query.filters) : [];
+  if (filterKeys.length === 0) {
+    return true;
+  }
+  const indexedFields = new Set(match.index.fields.map(String));
+  return filterKeys.every((field) => indexedFields.has(field));
+};
+var queryPageWindow = (query) => ({
+  offset: Math.max(0, query?.offset ?? 0),
+  ...query?.limit === void 0 ? {} : { limit: query.limit }
+});
 var sortRecords = (records, query) => {
   if (!query.orderBy) {
-    return [...records];
+    return records;
   }
   const direction = query.sort === "desc" ? -1 : 1;
   const key = String(query.orderBy);
-  return [...records].sort((left, right) => {
+  return records.slice().sort((left, right) => {
     const leftValue = left[key];
     const rightValue = right[key];
     if (leftValue === rightValue) {
@@ -163,7 +185,11 @@ var matchesFilters = (record, filters) => {
   for (const [field, expected] of Object.entries(filters)) {
     const actual = record[field];
     if (Array.isArray(expected)) {
-      if (!expected.includes(actual)) {
+      if (expected.length > 8) {
+        if (!new Set(expected).has(actual)) {
+          return false;
+        }
+      } else if (!expected.includes(actual)) {
         return false;
       }
       continue;
@@ -386,15 +412,34 @@ var MutationQueue = class {
     if (this.paused) {
       return [];
     }
+    return this.selectDue(await this.all(), options);
+  }
+  /** Filter an already-loaded queue snapshot without an extra storage read. */
+  selectDue(mutations, options = defaultQueueProcessingOptions) {
+    if (this.paused) {
+      return [];
+    }
     const timestamp = now();
-    const mutations = await this.all();
-    return mutations.filter((mutation) => mutation.status !== "processing").filter((mutation) => mutation.retries < options.retry.maxAttempts).filter((mutation) => {
-      if (!mutation.lastAttemptAt) {
-        return true;
+    const due = [];
+    for (const mutation of mutations) {
+      if (mutation.status === "processing") {
+        continue;
       }
-      const delay2 = backoffDelay(mutation.retries, options.retry);
-      return mutation.lastAttemptAt + delay2 <= timestamp;
-    }).slice(0, options.batchSize);
+      if (mutation.retries >= options.retry.maxAttempts) {
+        continue;
+      }
+      if (mutation.lastAttemptAt) {
+        const delay2 = backoffDelay(mutation.retries, options.retry);
+        if (mutation.lastAttemptAt + delay2 > timestamp) {
+          continue;
+        }
+      }
+      due.push(mutation);
+      if (due.length >= options.batchSize) {
+        break;
+      }
+    }
+    return due;
   }
   async remove(id) {
     await this.storage.delete(this.collectionName, id);
@@ -470,8 +515,11 @@ var MemoryStorageAdapter = class {
   }
   async find(collection, query) {
     const indexed = this.findViaIndex(collection, query);
-    const records = indexed ?? [...this.records.get(collection)?.values() ?? []].map((record) => clone(record));
-    return applyQuery(records, query);
+    if (indexed?.complete) {
+      return indexed.records.map((record) => clone(record));
+    }
+    const records = indexed?.records ?? [...this.records.get(collection)?.values() ?? []];
+    return applyQuery(records, query).map((record) => clone(record));
   }
   async clear(collection) {
     if (collection) {
@@ -573,16 +621,22 @@ var MemoryStorageAdapter = class {
     const valueKey = serializeCompoundIndexValue(match.values);
     const ids = this.secondary.get(collection)?.get(match.index.name)?.get(valueKey);
     if (!ids) {
-      return [];
+      return { complete: indexSatisfiesQuery(match, query), records: [] };
+    }
+    let idList = [...ids];
+    const complete = indexSatisfiesQuery(match, query);
+    if (complete) {
+      const { offset, limit } = queryPageWindow(query);
+      idList = limit === void 0 ? idList.slice(offset) : idList.slice(offset, offset + limit);
     }
     const records = [];
-    for (const id of ids) {
+    for (const id of idList) {
       const record = this.records.get(collection)?.get(id);
       if (record) {
-        records.push(clone(record));
+        records.push(record);
       }
     }
-    return records;
+    return { complete, records };
   }
   assertUniqueIndexes(collection, record, ignoreId) {
     for (const definition of this.indexes.get(collection)?.values() ?? []) {
@@ -671,10 +725,11 @@ var SyncEngine = class {
       return { completed: 0, failed: 0 };
     }
     this.running = true;
+    const options = this.processingOptions();
     const queued = await this.queue.all();
     this.events.emit("sync:start", { mode: "full", queued: queued.length });
     try {
-      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection);
+      const pushResult = this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection, queued, options);
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
       }
@@ -701,11 +756,9 @@ var SyncEngine = class {
     });
     return records;
   }
-  async push(collection) {
-    const options = this.processingOptions();
-    const due = (await this.queue.due(options)).filter(
-      (mutation) => !collection || mutation.collection === collection
-    );
+  async push(collection, queued, options = this.processingOptions()) {
+    const mutations = queued ?? await this.queue.all();
+    const due = this.queue.selectDue(mutations, options).filter((mutation) => !collection || mutation.collection === collection);
     let completed = 0;
     let failed = 0;
     for (const mutation of due) {
@@ -1028,10 +1081,8 @@ var OfflineDataCollection = class {
     }
   }
   async paginate(query = {}) {
-    const [data, allRecords] = await Promise.all([
-      this.find(query),
-      this.storage.find(this.name)
-    ]);
+    const allRecords = await this.storage.find(this.name);
+    const data = applyQuery(allRecords, query);
     return {
       data,
       limit: query.limit ?? data.length,
@@ -1141,7 +1192,10 @@ var IndexedDBStorageAdapter = class {
   }
   async find(collection, query) {
     const indexed = await this.findViaIndex(collection, query);
-    const records = indexed ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
+    if (indexed?.complete) {
+      return indexed.records;
+    }
+    const records = indexed?.records ?? (await this.getCollectionRows(collection)).map((row) => clone(row.value));
     return applyQuery(records, query);
   }
   async clear(collection) {
@@ -1189,7 +1243,7 @@ var IndexedDBStorageAdapter = class {
     const rows = await this.request(
       this.indexStore("readonly").getAll()
     );
-    return rows.filter((row) => !collection || row.collection === collection).map((row) => {
+    return rows.filter((row) => !collection || row.collection === collection || row.id.startsWith(`${collection}:`)).map((row) => {
       const definition = { ...row };
       delete definition.id;
       return clone(definition);
@@ -1223,17 +1277,27 @@ var IndexedDBStorageAdapter = class {
       match.index.name,
       serializeCompoundIndexValue(match.values)
     );
-    const entries = await this.request(
-      this.entryLookup("readonly").getAll(lookup)
-    );
-    const records = [];
-    for (const entry of entries) {
-      const record = await this.get(collection, entry.recordId);
-      if (record) {
-        records.push(record);
-      }
+    let entries = await this.request(this.entryLookup("readonly").getAll(lookup));
+    const complete = indexSatisfiesQuery(match, query);
+    if (complete) {
+      const { offset, limit } = queryPageWindow(query);
+      entries = limit === void 0 ? entries.slice(offset) : entries.slice(offset, offset + limit);
     }
-    return records;
+    if (entries.length === 0) {
+      return { complete, records: [] };
+    }
+    const database = await this.database();
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const rows = await Promise.all(
+      entries.map(
+        (entry) => this.request(store.get(this.key(collection, entry.recordId)))
+      )
+    );
+    return {
+      complete,
+      records: rows.filter((row) => Boolean(row)).map((row) => clone(row.value))
+    };
   }
   async assertUniqueIndexes(collection, record, ignoreId) {
     for (const definition of await this.listIndexes(collection)) {
@@ -1285,8 +1349,10 @@ var IndexedDBStorageAdapter = class {
     return this.request(index.getAll(collection));
   }
   async getEntriesForCollection(collection) {
-    const all = await this.request(this.entryStore("readonly").getAll());
-    return all.filter((entry) => entry.collection === collection);
+    const database = await this.database();
+    const transaction = database.transaction(INDEX_ENTRIES_STORE, "readonly");
+    const index = transaction.objectStore(INDEX_ENTRIES_STORE).index(COLLECTION_INDEX);
+    return this.request(index.getAll(collection));
   }
   store(mode) {
     return this.objectStoreProxy(STORE_NAME, mode);
@@ -1645,6 +1711,544 @@ var OPFSStorageAdapter = class {
 };
 var createOPFSStorage = (options) => new OPFSStorageAdapter(options);
 
+// packages/devtools-ui/src/index.ts
+var EVENT_NAMES = [
+  "sync:start",
+  "sync:end",
+  "offline",
+  "online",
+  "queue:add",
+  "queue:complete",
+  "conflict",
+  "error",
+  "worker:message",
+  "coordination:message"
+];
+var STYLE_ID = "offlinejs-devtools-styles";
+var createDevtoolsController = (db2, options = {}) => {
+  const maxEvents = options.maxEvents ?? 200;
+  const queueCollection = options.queueCollection ?? "__offline_queue";
+  const position = options.position ?? "bottom";
+  const storage2 = options.storage;
+  const entries = [];
+  const enabledTypes = new Set(EVENT_NAMES);
+  let seq = 0;
+  let paused = Boolean(options.paused);
+  let filterText = options.filter ?? "";
+  let selectedId = null;
+  let inspectorTab = "action";
+  let queueSnapshot = [];
+  let mode = null;
+  let host = null;
+  let root = null;
+  let keyHandler = null;
+  ensureStyles();
+  const record = (event, payload) => {
+    if (paused || !enabledTypes.has(event)) {
+      return;
+    }
+    seq += 1;
+    const entry = {
+      id: `ojd-${seq}`,
+      seq,
+      event,
+      payload: sanitizePayload(payload),
+      timestamp: Date.now()
+    };
+    entries.unshift(entry);
+    if (entries.length > maxEvents) {
+      entries.length = maxEvents;
+    }
+    if (!selectedId) {
+      selectedId = entry.id;
+    }
+    paint();
+    void refreshQueue().then(paint);
+  };
+  const disposers = EVENT_NAMES.map(
+    (event) => db2.on(event, (payload) => {
+      record(event, payload);
+    })
+  );
+  const filtered = () => {
+    const query = filterText.trim().toLowerCase();
+    return entries.filter((entry) => {
+      if (!enabledTypes.has(entry.event)) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return entry.event.toLowerCase().includes(query) || JSON.stringify(entry.payload).toLowerCase().includes(query);
+    });
+  };
+  const refreshQueue = async () => {
+    if (!storage2) {
+      queueSnapshot = [];
+      return;
+    }
+    try {
+      queueSnapshot = await storage2.find(queueCollection);
+    } catch {
+      queueSnapshot = [];
+    }
+  };
+  const ensureRoot = () => {
+    if (root) {
+      return root;
+    }
+    root = document.createElement("div");
+    root.className = "ojd-root";
+    root.dataset.offlinejsDevtools = "true";
+    root.addEventListener("click", onClick);
+    root.addEventListener("input", onInput);
+    root.addEventListener("change", onChange);
+    root.addEventListener("keydown", onKeydown);
+    return root;
+  };
+  const paint = () => {
+    if (!root) {
+      return;
+    }
+    const selected = entries.find((entry) => entry.id === selectedId) ?? filtered()[0] ?? null;
+    if (selected && selected.id !== selectedId) {
+      selectedId = selected.id;
+    }
+    root.innerHTML = createMarkup({
+      entries: filtered(),
+      selected,
+      paused,
+      filterText,
+      enabledTypes,
+      inspectorTab,
+      queueSnapshot,
+      mode: mode ?? "inline",
+      position,
+      total: entries.length
+    });
+  };
+  const mountInline = (target) => {
+    closeDock();
+    mode = "inline";
+    host = target;
+    const node = ensureRoot();
+    node.classList.remove("ojd-dock");
+    node.classList.add("ojd-inline");
+    node.dataset.position = "inline";
+    target.replaceChildren(node);
+    paint();
+    void refreshQueue().then(paint);
+  };
+  const openDock = () => {
+    mode = "dock";
+    const node = ensureRoot();
+    node.classList.remove("ojd-inline");
+    node.classList.add("ojd-dock");
+    node.dataset.position = position;
+    if (!node.isConnected) {
+      document.body.appendChild(node);
+    }
+    if (!keyHandler) {
+      keyHandler = (event) => {
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") {
+          event.preventDefault();
+          toggle();
+        }
+      };
+      window.addEventListener("keydown", keyHandler);
+    }
+    paint();
+    void refreshQueue().then(paint);
+  };
+  const closeDock = () => {
+    if (mode === "dock" && root?.isConnected) {
+      root.remove();
+    }
+    if (mode === "dock") {
+      mode = null;
+    }
+  };
+  const toggle = () => {
+    if (mode === "dock" && root?.isConnected) {
+      close();
+      return;
+    }
+    open();
+  };
+  const open = () => {
+    openDock();
+  };
+  const close = () => {
+    closeDock();
+    if (mode === "inline" && host && root) {
+      root.dataset.collapsed = "true";
+      paint();
+      return;
+    }
+    mode = null;
+  };
+  function onClick(event) {
+    const target = event.target;
+    const action = target?.closest("[data-ojd-action]")?.dataset.ojdAction;
+    if (!action) {
+      const row = target?.closest("[data-ojd-id]");
+      if (row?.dataset.ojdId) {
+        selectedId = row.dataset.ojdId;
+        inspectorTab = "action";
+        paint();
+      }
+      return;
+    }
+    switch (action) {
+      case "pause":
+        paused = !paused;
+        paint();
+        break;
+      case "clear":
+        entries.length = 0;
+        selectedId = null;
+        paint();
+        break;
+      case "close":
+        close();
+        break;
+      case "open":
+        open();
+        break;
+      case "tab-action":
+        inspectorTab = "action";
+        paint();
+        break;
+      case "tab-state":
+        inspectorTab = "state";
+        void refreshQueue().then(paint);
+        break;
+      case "toggle-type": {
+        const type = target?.closest("[data-ojd-type]")?.dataset.ojdType;
+        if (!type) {
+          break;
+        }
+        if (enabledTypes.has(type)) {
+          enabledTypes.delete(type);
+        } else {
+          enabledTypes.add(type);
+        }
+        paint();
+        break;
+      }
+      default:
+        break;
+    }
+  }
+  function onInput(event) {
+    const target = event.target;
+    if (target?.dataset.ojdInput === "filter") {
+      filterText = target.value;
+      paint();
+    }
+  }
+  function onChange(event) {
+    onInput(event);
+  }
+  function onKeydown(event) {
+    if (event.key === "Escape" && mode === "dock") {
+      close();
+    }
+  }
+  return {
+    clear() {
+      entries.length = 0;
+      selectedId = null;
+      paint();
+    },
+    close,
+    destroy() {
+      for (const dispose of disposers) {
+        dispose();
+      }
+      if (keyHandler) {
+        window.removeEventListener("keydown", keyHandler);
+        keyHandler = null;
+      }
+      closeDock();
+      if (mode === "inline" && root?.parentElement) {
+        root.remove();
+      }
+      root = null;
+      host = null;
+      mode = null;
+    },
+    events: () => [...entries],
+    mount: mountInline,
+    open,
+    pause() {
+      paused = true;
+      paint();
+    },
+    render: mountInline,
+    resume() {
+      paused = false;
+      paint();
+    },
+    select(id) {
+      selectedId = id;
+      paint();
+    },
+    toggle
+  };
+};
+var sanitizePayload = (payload) => {
+  if (payload instanceof Error) {
+    return {
+      name: payload.name,
+      message: payload.message,
+      stack: payload.stack
+    };
+  }
+  return payload;
+};
+var ensureStyles = () => {
+  if (typeof document === "undefined" || document.getElementById(STYLE_ID)) {
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = DEVTOOLS_CSS;
+  document.head.appendChild(style);
+};
+var createMarkup = (state) => {
+  const collapsed = state.mode === "inline" ? "" : "";
+  return `
+    <div class="ojd-shell ${collapsed}" data-position="${escapeHtml(state.position)}">
+      <header class="ojd-toolbar">
+        <div class="ojd-brand">
+          <span class="ojd-dot" aria-hidden="true"></span>
+          <strong>OfflineJS DevTools</strong>
+          <span class="ojd-meta">${state.total} event${state.total === 1 ? "" : "s"}</span>
+        </div>
+        <div class="ojd-tools">
+          <input
+            class="ojd-filter"
+            data-ojd-input="filter"
+            type="search"
+            placeholder="Filter events\u2026"
+            value="${escapeHtml(state.filterText)}"
+          />
+          <button type="button" class="ojd-btn" data-ojd-action="pause">${state.paused ? "Resume" : "Pause"}</button>
+          <button type="button" class="ojd-btn" data-ojd-action="clear">Clear</button>
+          ${state.mode === "dock" ? `<button type="button" class="ojd-btn" data-ojd-action="close" aria-label="Close">\u2715</button>` : ""}
+        </div>
+      </header>
+
+      <div class="ojd-filters">
+        ${EVENT_NAMES.map((name) => {
+    const on = state.enabledTypes.has(name);
+    return `<button type="button" class="ojd-chip ${on ? "is-on" : ""}" data-ojd-action="toggle-type" data-ojd-type="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
+  }).join("")}
+      </div>
+
+      <div class="ojd-body">
+        <aside class="ojd-list" aria-label="Event log">
+          ${state.entries.length === 0 ? `<p class="ojd-empty">Waiting for sync, queue, network, and conflict events\u2026</p>` : state.entries.map((entry) => {
+    const active = state.selected?.id === entry.id ? "is-selected" : "";
+    return `
+                      <button type="button" class="ojd-row ${active} tone-${toneFor(entry.event)}" data-ojd-id="${escapeHtml(entry.id)}">
+                        <span class="ojd-row-seq">#${entry.seq}</span>
+                        <span class="ojd-row-name">${escapeHtml(entry.event)}</span>
+                        <span class="ojd-row-summary">${escapeHtml(summarize(entry))}</span>
+                        <time class="ojd-row-time">${escapeHtml(new Date(entry.timestamp).toLocaleTimeString())}</time>
+                      </button>`;
+  }).join("")}
+        </aside>
+
+        <section class="ojd-inspector" aria-label="Inspector">
+          <div class="ojd-tabs">
+            <button type="button" class="ojd-tab ${state.inspectorTab === "action" ? "is-on" : ""}" data-ojd-action="tab-action">Action</button>
+            <button type="button" class="ojd-tab ${state.inspectorTab === "state" ? "is-on" : ""}" data-ojd-action="tab-state">State / Outbox</button>
+          </div>
+          <div class="ojd-inspect-body">
+            ${state.inspectorTab === "state" ? renderStateTab(state.queueSnapshot) : renderActionTab(state.selected)}
+          </div>
+        </section>
+      </div>
+      <footer class="ojd-footer">Tip: Ctrl/\u2318 + Shift + O toggles the floating dock</footer>
+    </div>
+  `;
+};
+var renderActionTab = (selected) => {
+  if (!selected) {
+    return `<p class="ojd-empty">Select an event from the log.</p>`;
+  }
+  return `
+    <div class="ojd-action-head">
+      <h3>${escapeHtml(selected.event)}</h3>
+      <p>#${selected.seq} \xB7 ${escapeHtml(new Date(selected.timestamp).toLocaleString())}</p>
+    </div>
+    <pre class="ojd-json">${escapeHtml(stringify(selected.payload))}</pre>
+  `;
+};
+var renderStateTab = (queue) => `
+  <div class="ojd-action-head">
+    <h3>Outbox snapshot</h3>
+    <p>${queue.length} queued mutation${queue.length === 1 ? "" : "s"}</p>
+  </div>
+  <pre class="ojd-json">${escapeHtml(stringify(queue))}</pre>
+`;
+var summarize = (entry) => {
+  const payload = entry.payload;
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  if (entry.event === "queue:add" || entry.event === "queue:complete") {
+    return `${String(payload.operation ?? "")} ${String(payload.collection ?? "")}/${String(payload.recordId ?? "")}`.trim();
+  }
+  if (entry.event === "sync:start") {
+    return `queued ${String(payload.queued ?? 0)}`;
+  }
+  if (entry.event === "sync:end") {
+    return `ok ${String(payload.completed ?? 0)} / fail ${String(payload.failed ?? 0)}`;
+  }
+  if (entry.event === "conflict") {
+    return String(payload.collection ?? "conflict");
+  }
+  if (entry.event === "error") {
+    return String(payload.message ?? "error");
+  }
+  if (entry.event === "online" || entry.event === "offline") {
+    return payload.online ? "online" : "offline";
+  }
+  return "";
+};
+var toneFor = (event) => {
+  if (event === "error" || event === "conflict") {
+    return "danger";
+  }
+  if (event === "queue:add" || event === "queue:complete") {
+    return "queue";
+  }
+  if (event === "sync:start" || event === "sync:end") {
+    return "sync";
+  }
+  if (event === "online" || event === "offline") {
+    return "net";
+  }
+  return "default";
+};
+var stringify = (value) => {
+  try {
+    return JSON.stringify(value, null, 2) ?? "null";
+  } catch {
+    return String(value);
+  }
+};
+var escapeHtml = (value) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+var DEVTOOLS_CSS = `
+.ojd-root {
+  --ojd-bg: #0f1719;
+  --ojd-panel: #152226;
+  --ojd-panel-2: #1b2b30;
+  --ojd-ink: #e7f7f3;
+  --ojd-muted: #9bb5b0;
+  --ojd-line: rgba(231, 247, 243, 0.12);
+  --ojd-accent: #2dd4bf;
+  --ojd-warn: #f4a261;
+  --ojd-danger: #fb7185;
+  --ojd-queue: #7dd3fc;
+  --ojd-sync: #a3e635;
+  --ojd-net: #c4b5fd;
+  --ojd-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  --ojd-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--ojd-ink);
+  font-family: var(--ojd-font);
+  box-sizing: border-box;
+}
+.ojd-root *, .ojd-root *::before, .ojd-root *::after { box-sizing: border-box; }
+.ojd-inline { width: 100%; min-height: 22rem; }
+.ojd-dock {
+  position: fixed;
+  z-index: 2147483000;
+  box-shadow: 0 -12px 40px rgba(0,0,0,.35);
+}
+.ojd-dock[data-position="bottom"] {
+  left: 0; right: 0; bottom: 0; height: min(42vh, 420px);
+}
+.ojd-dock[data-position="right"] {
+  top: 0; right: 0; bottom: 0; width: min(42vw, 480px);
+}
+.ojd-shell {
+  display: flex; flex-direction: column; height: 100%;
+  background: linear-gradient(180deg, var(--ojd-panel), var(--ojd-bg));
+  border: 1px solid var(--ojd-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ojd-dock .ojd-shell { border-radius: 12px 12px 0 0; height: 100%; }
+.ojd-dock[data-position="right"] .ojd-shell { border-radius: 12px 0 0 12px; }
+.ojd-toolbar, .ojd-footer, .ojd-filters, .ojd-tabs, .ojd-action-head {
+  padding: 0.65rem 0.8rem;
+}
+.ojd-toolbar {
+  display: flex; gap: 0.75rem; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--ojd-line); background: rgba(0,0,0,.18);
+}
+.ojd-brand { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.ojd-brand strong { font-size: 0.92rem; letter-spacing: -0.02em; }
+.ojd-dot {
+  width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--ojd-accent);
+  box-shadow: 0 0 0 3px rgba(45,212,191,.18);
+}
+.ojd-meta, .ojd-row-time, .ojd-empty, .ojd-footer, .ojd-action-head p { color: var(--ojd-muted); font-size: 0.78rem; }
+.ojd-tools { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.ojd-filter {
+  width: min(14rem, 42vw); border: 1px solid var(--ojd-line); border-radius: 8px;
+  background: var(--ojd-panel-2); color: var(--ojd-ink); padding: 0.35rem 0.55rem; font: inherit;
+}
+.ojd-btn, .ojd-chip, .ojd-tab, .ojd-row {
+  border: 1px solid var(--ojd-line); background: var(--ojd-panel-2); color: var(--ojd-ink);
+  border-radius: 8px; cursor: pointer; font: inherit;
+}
+.ojd-btn { padding: 0.3rem 0.55rem; font-size: 0.78rem; }
+.ojd-btn:hover, .ojd-chip:hover, .ojd-tab:hover, .ojd-row:hover { border-color: rgba(45,212,191,.45); }
+.ojd-filters {
+  display: flex; flex-wrap: wrap; gap: 0.35rem; border-bottom: 1px solid var(--ojd-line);
+}
+.ojd-chip { padding: 0.2rem 0.45rem; font-size: 0.7rem; opacity: 0.55; }
+.ojd-chip.is-on { opacity: 1; background: rgba(45,212,191,.12); border-color: rgba(45,212,191,.35); }
+.ojd-body { display: grid; grid-template-columns: minmax(12rem, 38%) 1fr; min-height: 0; flex: 1; }
+@media (max-width: 720px) {
+  .ojd-body { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }
+}
+.ojd-list { overflow: auto; border-right: 1px solid var(--ojd-line); min-height: 0; }
+.ojd-row {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto;
+  gap: 0.1rem 0.55rem; text-align: left; padding: 0.55rem 0.7rem; border-radius: 0; border: 0;
+  border-bottom: 1px solid var(--ojd-line); background: transparent;
+}
+.ojd-row.is-selected { background: rgba(45,212,191,.1); }
+.ojd-row-seq { grid-row: 1 / span 2; align-self: center; color: var(--ojd-muted); font-family: var(--ojd-mono); font-size: 0.72rem; }
+.ojd-row-name { font-weight: 700; font-size: 0.82rem; }
+.ojd-row-summary { grid-column: 2; color: var(--ojd-muted); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ojd-row-time { grid-column: 2; justify-self: end; }
+.ojd-row.tone-danger .ojd-row-name { color: var(--ojd-danger); }
+.ojd-row.tone-queue .ojd-row-name { color: var(--ojd-queue); }
+.ojd-row.tone-sync .ojd-row-name { color: var(--ojd-sync); }
+.ojd-row.tone-net .ojd-row-name { color: var(--ojd-net); }
+.ojd-inspector { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.ojd-tabs { display: flex; gap: 0.35rem; border-bottom: 1px solid var(--ojd-line); }
+.ojd-tab { padding: 0.35rem 0.65rem; font-size: 0.78rem; background: transparent; }
+.ojd-tab.is-on { background: rgba(45,212,191,.12); border-color: rgba(45,212,191,.35); }
+.ojd-inspect-body { overflow: auto; padding: 0.75rem; min-height: 0; flex: 1; }
+.ojd-action-head h3 { margin: 0 0 0.2rem; font-size: 1rem; }
+.ojd-action-head { padding: 0 0 0.75rem; }
+.ojd-json {
+  margin: 0; padding: 0.75rem; border-radius: 10px; overflow: auto;
+  background: rgba(0,0,0,.28); border: 1px solid var(--ojd-line);
+  font-family: var(--ojd-mono); font-size: 0.75rem; line-height: 1.45; white-space: pre-wrap;
+}
+.ojd-empty { margin: 1rem; }
+.ojd-footer { border-top: 1px solid var(--ojd-line); }
+`;
+
 // packages/devtools/src/index.ts
 var eventNames = [
   "sync:start",
@@ -1660,10 +2264,10 @@ var eventNames = [
 ];
 var devtools = (options = {}) => ({
   name: "devtools",
-  setup({ events: events2 }) {
+  setup({ db: db2, events, storage: storage2 }) {
     const logger = options.logger ?? console;
     const disposers = eventNames.map(
-      (eventName) => events2.on(eventName, (payload) => {
+      (eventName) => events.on(eventName, (payload) => {
         if (eventName === "error") {
           logger.error("[offlinejs]", eventName, payload);
           return;
@@ -1671,82 +2275,23 @@ var devtools = (options = {}) => ({
         logger.debug("[offlinejs]", eventName, payload);
       })
     );
+    let panel2;
+    if (options.ui && typeof document !== "undefined") {
+      const uiOptions = options.ui === true ? {} : options.ui;
+      panel2 = createDevtoolsController(db2, {
+        ...uiOptions,
+        storage: uiOptions.storage ?? storage2
+      });
+      panel2.open();
+    }
     return () => {
+      panel2?.destroy();
       for (const dispose of disposers) {
         dispose();
       }
     };
   }
 });
-
-// packages/devtools-ui/src/index.ts
-var events = [
-  "sync:start",
-  "sync:end",
-  "offline",
-  "online",
-  "queue:add",
-  "queue:complete",
-  "conflict",
-  "error",
-  "worker:message",
-  "coordination:message"
-];
-var createDevtoolsController = (db2) => {
-  const entries = [];
-  let target = null;
-  const refresh = () => {
-    if (target) {
-      target.innerHTML = createMarkup(entries);
-    }
-  };
-  const disposers = events.map(
-    (event) => db2.on(event, (payload) => {
-      entries.unshift({
-        event,
-        payload,
-        timestamp: Date.now()
-      });
-      entries.splice(100);
-      refresh();
-    })
-  );
-  const render = (nextTarget) => {
-    target = nextTarget;
-    refresh();
-  };
-  return {
-    destroy() {
-      for (const dispose of disposers) {
-        dispose();
-      }
-      target = null;
-    },
-    events: () => [...entries],
-    mount: render,
-    render
-  };
-};
-var createMarkup = (entries) => `
-  <section class="offlinejs-devtools" style="font-family: ui-sans-serif, system-ui, sans-serif; padding: 12px">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px">
-      <h2 style="margin:0;font-size:1.05rem">OfflineJS Devtools</h2>
-      <span style="opacity:.7;font-size:.85rem">${entries.length} event${entries.length === 1 ? "" : "s"}</span>
-    </div>
-    ${entries.length === 0 ? `<p style="margin:0;opacity:.7">Waiting for sync, queue, network, and conflict events\u2026</p>` : `<ol style="padding-left:20px;margin:0;display:grid;gap:10px">
-            ${entries.map(
-  (entry) => `
-                  <li>
-                    <strong>${escapeHtml(entry.event)}</strong>
-                    <time style="margin-left:8px;opacity:.7;font-size:.85rem">${new Date(entry.timestamp).toLocaleTimeString()}</time>
-                    <pre style="margin:6px 0 0;padding:8px;overflow:auto;border-radius:8px;background:rgba(0,0,0,.06);font-size:12px">${escapeHtml(JSON.stringify(entry.payload, null, 2))}</pre>
-                  </li>
-                `
-).join("")}
-          </ol>`}
-  </section>
-`;
-var escapeHtml = (value) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
 // packages/offlinejs/src/index.ts
 var isBrowserRuntime = () => typeof globalThis.window !== "undefined" && typeof globalThis.indexedDB !== "undefined";
@@ -1924,7 +2469,7 @@ var network = new BrowserNetworkMonitor({ initialOnline: true });
 var storage = createIndexedDBStorage({ databaseName: DB_NAME });
 var conflictStrategy = "lastWriteWins" /* LastWriteWins */;
 var db = createDemoDb();
-var panel = createDevtoolsController(db);
+var panel = createDevtoolsController(db, { storage });
 var unsubscribe;
 var eventDisposers = [];
 var els;
@@ -2134,7 +2679,7 @@ async function recreateDb(message, clearLocal = false) {
   }
   storage = createIndexedDBStorage({ databaseName: DB_NAME });
   db = createDemoDb();
-  panel = createDevtoolsController(db);
+  panel = createDevtoolsController(db, { storage });
   panel.mount(els.devtools);
   wireEvents();
   await bindCollection();
