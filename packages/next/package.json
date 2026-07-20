@@ -31,5 +31,9 @@
   "devDependencies": {
     "tsup": "latest",
     "typescript": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

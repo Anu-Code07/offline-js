@@ -18,10 +18,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@offlinejs/types": "workspace:*"
+    "@offlinejs/types": "workspace:*",
+    "@offlinejs/utils": "workspace:*"
   },
   "devDependencies": {
     "tsup": "latest",
     "typescript": "latest"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }
