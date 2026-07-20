@@ -49,12 +49,15 @@ export class SyncEngine {
     }
 
     this.running = true;
+    const options = this.processingOptions();
     const queued = await this.queue.all();
     this.events.emit("sync:start", { mode: "full", queued: queued.length });
 
     try {
       const pushResult =
-        this.syncOptions.push === false ? { completed: 0, failed: 0 } : await this.push(collection);
+        this.syncOptions.push === false
+          ? { completed: 0, failed: 0 }
+          : await this.push(collection, queued, options);
 
       if (this.syncOptions.pull !== false && collection) {
         await this.pull(collection);
@@ -91,11 +94,15 @@ export class SyncEngine {
     return records;
   }
 
-  private async push(collection?: string): Promise<SyncResult> {
-    const options = this.processingOptions();
-    const due = (await this.queue.due(options)).filter(
-      (mutation) => !collection || mutation.collection === collection
-    );
+  private async push(
+    collection?: string,
+    queued?: QueuedMutation[],
+    options: QueueProcessingOptions = this.processingOptions()
+  ): Promise<SyncResult> {
+    const mutations = queued ?? (await this.queue.all());
+    const due = this.queue
+      .selectDue(mutations, options)
+      .filter((mutation) => !collection || mutation.collection === collection);
     let completed = 0;
     let failed = 0;
 

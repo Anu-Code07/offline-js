@@ -19,6 +19,7 @@ const pages = [
   ["architecture", "docs/architecture.md", "Architecture", "docs"],
   ["storage", "docs/storage-adapters.md", "Storage", "docs"],
   ["sync", "docs/sync-engine.md", "Sync", "docs"],
+  ["benchmarks", "docs/benchmarks.md", "Benchmarks", "docs"],
   ["plugins", "docs/plugins.md", "Plugins", "docs"],
   ["contracts", "docs/public-contracts.md", "Contracts", "docs"],
   ["practices", "docs/best-practices.md", "Practices", "docs"],
@@ -233,11 +234,11 @@ await db.collection("todos").create({ title: "Works offline" });</code></pre>
       <div class="section-inner">
         <p class="section-kicker reveal">Docs</p>
         <h2 class="section-title reveal">Explore the system.</h2>
-        <p class="section-copy reveal">Architecture, adapters, sync, plugins, contracts, and the roadmap—all in one place.</p>
+        <p class="section-copy reveal">Architecture, adapters, sync, plugins, benchmarks, and the roadmap—all in one place.</p>
         <div class="cta-row reveal">
           <a class="button button-primary" href="architecture.html">Architecture</a>
           <a class="button button-secondary" href="storage.html">Storage</a>
-          <a class="button button-secondary" href="sync.html">Sync</a>
+          <a class="button button-secondary" href="benchmarks.html">Benchmarks</a>
           <a class="button button-secondary" href="roadmap.html">Roadmap</a>
         </div>
       </div>

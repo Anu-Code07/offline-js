@@ -367,6 +367,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | [Plugins](./docs/plugins.md) | Extending OfflineJS |
 | [FAQ](./docs/faq.md) | Common consumer questions |
 | [Architecture](./docs/architecture.md) | How the pieces fit together |
+| [Benchmarks](./docs/benchmarks.md) | Measured adapter scores (`pnpm bench`) |
 
 ### Docs site
 
@@ -379,9 +380,18 @@ Static HTML is written to `docs-site/out` (committed) and mirrored to `docs-site
 
 Vercel publishes `docs-site/out` with install/build commands set to `true` (no pnpm, no compile). See [`docs-site/README.md`](./docs-site/README.md) for the exact Vercel project settings.
 
+### Benchmarks
+
+```bash
+pnpm bench
+# optional: OFFLINEJS_BENCH_RECORDS=50000 pnpm bench
+```
+
+Writes `docs/benchmarks.md` + `docs/benchmark-results.json` from real `@offlinejs/storage-*` adapters.
+
 ## Advanced package composition
 
-Still one import — pull the helpers you need from `@offlinejs`:
+Still one import — pull the helpers you need from `@offlinejs/client`:
 
 ```ts
 import {

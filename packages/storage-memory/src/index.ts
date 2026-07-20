@@ -12,6 +12,8 @@ import {
   clone,
   findMatchingIndex,
   getEqualityFilterLookups,
+  indexSatisfiesQuery,
+  queryPageWindow,
   readIndexFields,
   serializeCompoundIndexValue
 } from "@offlinejs/utils";
@@ -74,11 +76,15 @@ export class MemoryStorageAdapter implements IndexableStorageAdapter {
     query?: QueryOptions<TRecord>
   ): Promise<TRecord[]> {
     const indexed = this.findViaIndex<TRecord>(collection, query);
-    const records =
-      indexed ??
-      [...(this.records.get(collection)?.values() ?? [])].map((record) => clone(record as TRecord));
+    if (indexed?.complete) {
+      return indexed.records.map((record) => clone(record));
+    }
 
-    return applyQuery(records, query);
+    const records =
+      indexed?.records ?? ([...(this.records.get(collection)?.values() ?? [])] as TRecord[]);
+
+    // Filter/sort/limit on live refs, then clone only the page returned to callers.
+    return applyQuery(records, query).map((record) => clone(record));
   }
 
   async clear(collection?: string): Promise<void> {
@@ -196,7 +202,7 @@ export class MemoryStorageAdapter implements IndexableStorageAdapter {
   private findViaIndex<TRecord extends EntityRecord>(
     collection: string,
     query?: QueryOptions<TRecord>
-  ): TRecord[] | null {
+  ): { complete: boolean; records: TRecord[] } | null {
     const definitions = [...(this.indexes.get(collection)?.values() ?? [])];
     const match = findMatchingIndex(definitions, getEqualityFilterLookups(query?.filters));
 
@@ -207,18 +213,25 @@ export class MemoryStorageAdapter implements IndexableStorageAdapter {
     const valueKey = serializeCompoundIndexValue(match.values);
     const ids = this.secondary.get(collection)?.get(match.index.name)?.get(valueKey);
     if (!ids) {
-      return [];
+      return { complete: indexSatisfiesQuery(match, query), records: [] };
+    }
+
+    let idList = [...ids];
+    const complete = indexSatisfiesQuery(match, query);
+    if (complete) {
+      const { offset, limit } = queryPageWindow(query);
+      idList = limit === undefined ? idList.slice(offset) : idList.slice(offset, offset + limit);
     }
 
     const records: TRecord[] = [];
-    for (const id of ids) {
+    for (const id of idList) {
       const record = this.records.get(collection)?.get(id);
       if (record) {
-        records.push(clone(record as TRecord));
+        records.push(record as TRecord);
       }
     }
 
-    return records;
+    return { complete, records };
   }
 
   private assertUniqueIndexes(

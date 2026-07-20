@@ -12,6 +12,8 @@ import {
   clone,
   findMatchingIndex,
   getEqualityFilterLookups,
+  indexSatisfiesQuery,
+  queryPageWindow,
   readIndexFields,
   serializeCompoundIndexValue
 } from "@offlinejs/utils";
@@ -102,8 +104,12 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     query?: QueryOptions<TRecord>
   ): Promise<TRecord[]> {
     const indexed = await this.findViaIndex<TRecord>(collection, query);
+    if (indexed?.complete) {
+      return indexed.records;
+    }
+
     const records =
-      indexed ??
+      indexed?.records ??
       (await this.getCollectionRows(collection)).map((row) => clone(row.value as TRecord));
 
     return applyQuery(records, query);
@@ -167,7 +173,7 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     );
 
     return rows
-      .filter((row) => !collection || row.collection === collection)
+      .filter((row) => !collection || row.collection === collection || row.id.startsWith(`${collection}:`))
       .map((row) => {
         const definition = { ...row } as IndexDefinition & { id?: string };
         delete definition.id;
@@ -200,7 +206,7 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   private async findViaIndex<TRecord extends EntityRecord>(
     collection: string,
     query?: QueryOptions<TRecord>
-  ): Promise<TRecord[] | null> {
+  ): Promise<{ complete: boolean; records: TRecord[] } | null> {
     const match = findMatchingIndex(
       await this.listIndexes(collection),
       getEqualityFilterLookups(query?.filters)
@@ -215,19 +221,34 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
       match.index.name,
       serializeCompoundIndexValue(match.values)
     );
-    const entries = await this.request<IndexEntryRow[]>(
-      this.entryLookup("readonly").getAll(lookup)
-    );
-    const records: TRecord[] = [];
+    let entries = await this.request<IndexEntryRow[]>(this.entryLookup("readonly").getAll(lookup));
+    const complete = indexSatisfiesQuery(match, query);
 
-    for (const entry of entries) {
-      const record = await this.get<TRecord>(collection, entry.recordId);
-      if (record) {
-        records.push(record);
-      }
+    if (complete) {
+      const { offset, limit } = queryPageWindow(query);
+      entries =
+        limit === undefined ? entries.slice(offset) : entries.slice(offset, offset + limit);
     }
 
-    return records;
+    if (entries.length === 0) {
+      return { complete, records: [] };
+    }
+
+    const database = await this.database();
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const rows = await Promise.all(
+      entries.map((entry) =>
+        this.request<IndexedDBRow | undefined>(store.get(this.key(collection, entry.recordId)))
+      )
+    );
+
+    return {
+      complete,
+      records: rows
+        .filter((row): row is IndexedDBRow => Boolean(row))
+        .map((row) => clone(row.value as TRecord))
+    };
   }
 
   private async assertUniqueIndexes(
@@ -296,8 +317,10 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
   }
 
   private async getEntriesForCollection(collection: string): Promise<IndexEntryRow[]> {
-    const all = await this.request<IndexEntryRow[]>(this.entryStore("readonly").getAll());
-    return all.filter((entry) => entry.collection === collection);
+    const database = await this.database();
+    const transaction = database.transaction(INDEX_ENTRIES_STORE, "readonly");
+    const index = transaction.objectStore(INDEX_ENTRIES_STORE).index(COLLECTION_INDEX);
+    return this.request<IndexEntryRow[]>(index.getAll(collection));
   }
 
   private store(mode: IDBTransactionMode): IDBObjectStore {
