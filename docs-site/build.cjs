@@ -642,25 +642,7 @@ function markdownToHtml(markdown) {
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/^\|(.+)\|$/gm, (row) => {
-      const cells = row
-        .split("|")
-        .slice(1, -1)
-        .map((cell) => cell.trim());
-      if (cells.every((cell) => /^:?-+:?$/.test(cell))) {
-        return "@@TABLE_DIVIDER@@";
-      }
-      return `<tr>${cells.map((cell) => `<td>${cell}</td>`).join("")}</tr>`;
-    })
-    .replace(/(?:<tr>.*<\/tr>\n?)+/g, (block) => {
-      const cleaned = block.replace(/@@TABLE_DIVIDER@@\n?/g, "");
-      const withHeader = cleaned.replace(
-        /<tr>(.*?)<\/tr>/,
-        (_match, first) =>
-          `<thead><tr>${first.replaceAll("<td>", "<th>").replaceAll("</td>", "</th>")}</tr></thead><tbody>`
-      );
-      return `<table>${withHeader}</tbody></table>`;
-    })
+    .replace(/(?:^\|.+\|[ \t]*(?:\n|$))+/gm, (tableBlock) => renderMarkdownTable(tableBlock))
     .replace(/^- (.*)$/gm, "<li>$1</li>")
     .replace(/(?:<li>.*<\/li>\n?)+/g, (block) => `<ul>${block}</ul>`)
     .replace(/\n{2,}/g, "</p><p>")
@@ -670,15 +652,86 @@ function markdownToHtml(markdown) {
     .replace(/<\/h([1-3])><\/p>/g, "</h$1>")
     .replace(/<p><ul>/g, "<ul>")
     .replace(/<\/ul><\/p>/g, "</ul>")
-    .replace(/<p><table>/g, "<table>")
+    .replace(/<p><div class="table-wrap">/g, '<div class="table-wrap">')
+    .replace(/<\/div><\/p>/g, "</div>")
+    .replace(/<p><table/g, "<table")
     .replace(/<\/table><\/p>/g, "</table>")
-    .replace(/<p>\s*<\/p>/g, "");
+    .replace(/<p>\s*<\/p>/g, "")
+    .replace(/<p>(Generated:)/g, '<p class="content-meta">$1');
 
   fenced.forEach((block, index) => {
     html = html.replace(`@@CODE_${index}@@`, block).replace(`<p>${block}</p>`, block);
   });
 
   return html;
+}
+
+function renderMarkdownTable(tableBlock) {
+  const lines = tableBlock
+    .trim()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 2) {
+    return tableBlock;
+  }
+
+  const parseRow = (line) =>
+    line
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+
+  const alignments = [];
+  const rows = [];
+
+  for (const line of lines) {
+    const cells = parseRow(line);
+    if (cells.length === 0) {
+      continue;
+    }
+
+    if (cells.every((cell) => /^:?-+:?$/.test(cell))) {
+      cells.forEach((cell, index) => {
+        if (cell.startsWith(":") && cell.endsWith(":")) {
+          alignments[index] = "center";
+        } else if (cell.endsWith(":")) {
+          alignments[index] = "right";
+        } else {
+          alignments[index] = "left";
+        }
+      });
+      continue;
+    }
+
+    rows.push(cells);
+  }
+
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const [header, ...body] = rows;
+  const alignAttr = (index) => {
+    const align = alignments[index];
+    return align && align !== "left" ? ` style="text-align:${align}"` : "";
+  };
+
+  const head = `<thead><tr>${header
+    .map((cell, index) => `<th${alignAttr(index)}>${cell}</th>`)
+    .join("")}</tr></thead>`;
+  const bodyHtml =
+    body.length === 0
+      ? "<tbody></tbody>"
+      : `<tbody>${body
+          .map(
+            (row) =>
+              `<tr>${row.map((cell, index) => `<td${alignAttr(index)}>${cell}</td>`).join("")}</tr>`
+          )
+          .join("")}</tbody>`;
+
+  return `<div class="table-wrap"><table class="data-table">${head}${bodyHtml}</table></div>\n`;
 }
 
 function escapeHtml(value) {

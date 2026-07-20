@@ -219,6 +219,14 @@ body.nav-open .nav-toggle-bars::after {
 
 .nav a[aria-current="page"] {
   color: var(--ink);
+  background: rgba(15, 174, 154, 0.1);
+  border-radius: 0.55rem;
+  padding: 0.3rem 0.55rem;
+}
+
+.nav a[aria-current="page"]::after {
+  left: 0.55rem;
+  width: calc(100% - 1.1rem);
 }
 
 /* ——— Hero ——— */
@@ -729,6 +737,10 @@ body.nav-open .nav-toggle-bars::after {
   color: var(--ink);
 }
 
+.sidebar a[aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--signal);
+}
+
 .content {
   min-width: 0;
 }
@@ -746,8 +758,11 @@ body.nav-open .nav-toggle-bars::after {
 }
 
 .content h1 {
-  font-size: clamp(2.2rem, 5vw, 3.4rem);
-  margin-bottom: 1rem;
+  font-size: clamp(2rem, 4.6vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  margin: 0 0 0.65rem;
+  max-width: 18ch;
 }
 
 .content h2 {
@@ -760,9 +775,23 @@ body.nav-open .nav-toggle-bars::after {
   font-size: 1.2rem;
 }
 
+.content-meta {
+  margin: 0 0 1.75rem;
+  font-size: 0.9rem;
+  font-family: var(--font-mono);
+  color: var(--ink-soft);
+  opacity: 0.9;
+}
+
 .content p,
 .content li {
   color: var(--ink-soft);
+}
+
+.content h1 + .content-meta + table,
+.content h1 + p + table,
+.content .content-meta + table {
+  margin-top: 0.25rem;
 }
 
 .content pre {
@@ -788,28 +817,58 @@ body.nav-open .nav-toggle-bars::after {
   border-radius: 0.35rem;
 }
 
-.content table {
+.content table,
+.content .data-table {
   width: 100%;
-  border-collapse: collapse;
-  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
-  display: block;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  margin: 0;
+  overflow: hidden;
+}
+
+.content .table-wrap {
+  margin: 1.25rem 0 1.75rem;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+}
+
+.content table thead,
+.content .data-table thead {
+  background: rgba(15, 174, 154, 0.12);
 }
 
 .content th,
 .content td {
-  padding: 0.75rem 0.85rem;
+  padding: 0.8rem 0.95rem;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
 
 .content th {
-  background: rgba(15, 174, 154, 0.1);
   color: var(--ink);
   font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(16, 42, 46, 0.16);
+}
+
+.content tbody tr:nth-child(even) td {
+  background: rgba(15, 174, 154, 0.04);
+}
+
+.content tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.content tbody tr:hover td {
+  background: rgba(15, 174, 154, 0.08);
 }
 
 /* Footer */

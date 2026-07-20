@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/styles.css?v=e49414b1b7" />
+    <link rel="stylesheet" href="assets/styles.css?v=b5ad0f6e49" />
     
   </head>
   <body>
@@ -37,12 +37,7 @@ const db = createOfflineDB({
   baseURL: &quot;https://api.example.com&quot;,
   storage: OfflineStorage.IndexedDB, // or OfflineStorage.Memory | OfflineStorage.OPFS
   sync: { conflictStrategy: ConflictStrategyName.LastWriteWins }
-});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>OfflineStorage.IndexedDB</code> in browsers and <code>OfflineStorage.Memory</code> elsewhere.</p><table><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody>
-</tbody></table>@@TABLE_DIVIDER@@
-<table><thead><tr><th><code>OfflineStorage</code></th><th><code>Memory</code>, <code>IndexedDB</code>, <code>OPFS</code></th></tr></thead><tbody>
-<tr><td><code>ConflictStrategyName</code></td><td><code>ClientWins</code>, <code>ServerWins</code>, <code>LastWriteWins</code>, <code>Merge</code></td></tr>
-</tbody></table>
-Need a specialized helper? Import it from the same package:</p><pre><code>import {
+});</code></pre><p>If <code>storage</code> is omitted, OfflineJS picks <code>OfflineStorage.IndexedDB</code> in browsers and <code>OfflineStorage.Memory</code> elsewhere.</p><div class="table-wrap"><table class="data-table"><thead><tr><th>Enum</th><th>Values</th></tr></thead><tbody><tr><td><code>OfflineStorage</code></td><td><code>Memory</code>, <code>IndexedDB</code>, <code>OPFS</code></td></tr><tr><td><code>ConflictStrategyName</code></td><td><code>ClientWins</code>, <code>ServerWins</code>, <code>LastWriteWins</code>, <code>Merge</code></td></tr></tbody></table></div><p>Need a specialized helper? Import it from the same package:</p><pre><code>import {
   createOfflineDB,
   createAuthTransport,
   createSQLiteStorage,
