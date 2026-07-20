@@ -1,4 +1,4 @@
-# HTTP cache (`@offlinejs/cache`)
+# HTTP cache (`@offlinejs/http-cache`)
 
 General-purpose **read-through** cache for GET/JSON (and optional Cache API for assets).
 
@@ -9,7 +9,7 @@ This is **not** the offline mutation queue. Use `createOfflineDB` when users mus
 Already included with `@offlinejs/client`, or:
 
 ```bash
-pnpm add @offlinejs/cache
+pnpm add @offlinejs/http-cache
 ```
 
 ## Quick start

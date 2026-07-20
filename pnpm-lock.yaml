@@ -257,9 +257,6 @@ importers:
       '@offlinejs/broadcast':
         specifier: workspace:*
         version: link:../coordination
-      '@offlinejs/cache':
-        specifier: workspace:*
-        version: link:../cache
       '@offlinejs/conflicts':
         specifier: workspace:*
         version: link:../conflicts
@@ -275,6 +272,9 @@ importers:
       '@offlinejs/encryption':
         specifier: workspace:*
         version: link:../encryption
+      '@offlinejs/http-cache':
+        specifier: workspace:*
+        version: link:../cache
       '@offlinejs/network':
         specifier: workspace:*
         version: link:../network

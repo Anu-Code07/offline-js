@@ -10,7 +10,7 @@ import {
   invalidateCacheKey
 } from "./index";
 
-describe("@offlinejs/cache", () => {
+describe("@offlinejs/http-cache", () => {
   afterEach(async () => {
     await clearHttpCache();
     vi.restoreAllMocks();

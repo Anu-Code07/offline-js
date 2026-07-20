@@ -20,7 +20,7 @@
       "@offlinejs/core": ["./packages/core/src/index.ts"],
       "@offlinejs/auth": ["./packages/auth/src/index.ts"],
       "@offlinejs/benchmarks": ["./packages/benchmarks/src/index.ts"],
-      "@offlinejs/cache": ["./packages/cache/src/index.ts"],
+      "@offlinejs/http-cache": ["./packages/cache/src/index.ts"],
       "@offlinejs/conflicts": ["./packages/conflicts/src/index.ts"],
       "@offlinejs/broadcast": ["./packages/coordination/src/index.ts"],
       "@offlinejs/devtools": ["./packages/devtools/src/index.ts"],

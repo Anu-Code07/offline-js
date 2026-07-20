@@ -148,7 +148,7 @@ export const createIndexedDBHttpCache = (
 
   const db = () => {
     if (!globalThis.indexedDB) {
-      throw new Error("@offlinejs/cache IndexedDB store requires indexedDB");
+      throw new Error("@offlinejs/http-cache IndexedDB store requires indexedDB");
     }
     dbPromise ??= openCacheDb(databaseName);
     return dbPromise;
@@ -190,7 +190,7 @@ export const createCacheApiStore = (options: CacheApiStoreOptions = {}) => {
 
   const open = async () => {
     if (!globalThis.caches) {
-      throw new Error("@offlinejs/cache Cache API store requires caches");
+      throw new Error("@offlinejs/http-cache Cache API store requires caches");
     }
     return globalThis.caches.open(cacheName);
   };

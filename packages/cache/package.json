@@ -1,5 +1,5 @@
 {
-  "name": "@offlinejs/cache",
+  "name": "@offlinejs/http-cache",
   "version": "0.1.0",
   "description": "General-purpose HTTP / JSON cache layer (TTL + stale-while-revalidate) for OfflineJS apps.",
   "type": "module",

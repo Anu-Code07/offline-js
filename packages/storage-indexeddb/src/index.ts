@@ -274,7 +274,7 @@ export class IndexedDBStorageAdapter implements IndexableStorageAdapter {
     const complete = indexSatisfiesQuery(match, query);
 
     if (complete) {
-      const { offset, limit } = queryPageWindow(query);
+      const { offset, limit } = queryPageWindow(query as Parameters<typeof queryPageWindow>[0]);
       entries =
         limit === undefined ? entries.slice(offset) : entries.slice(offset, offset + limit);
     }
