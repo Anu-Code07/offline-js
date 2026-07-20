@@ -8,7 +8,7 @@ import {
   type ConflictStrategy,
   type OfflineDB,
   type StorageAdapter
-} from "@offlinejs";
+} from "@offlinejs/client";
 import type { QueuedMutation } from "@offlinejs/types";
 import { FakeStockApi, type StockItem } from "./fake-api";
 

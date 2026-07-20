@@ -65,7 +65,7 @@ export const resolveStorage = (
  *
  * @example
  * ```ts
- * import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
+ * import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
  *
  * const db = createOfflineDB({
  *   baseURL: "https://api.example.com",
@@ -160,11 +160,11 @@ export {
   backgroundSyncPlugin,
   createOfflineSyncWorkerHandler,
   registerOfflineServiceWorker
-} from "@offlinejs/service-worker";
+} from "@offlinejs/sw";
 export {
   coordinationPlugin,
   createBroadcastCoordination
-} from "@offlinejs/coordination";
+} from "@offlinejs/broadcast";
 export {
   createFieldMergeResolver,
   mergeGrowOnlyCounter,

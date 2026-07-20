@@ -52,11 +52,11 @@ function main() {
 Install OfflineJS and start writing local-first data in minutes.
 
 \`\`\`bash
-pnpm add @offlinejs
+pnpm add @offlinejs/client
 \`\`\`
 
 \`\`\`ts
-import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
@@ -216,9 +216,9 @@ function renderHome() {
         <p class="section-kicker reveal">Install</p>
         <h2 class="section-title reveal">Ship the first offline collection today.</h2>
         <p class="section-copy reveal">One package for the API. One adapter for persistence. Sync comes with you.</p>
-        <pre class="code-panel reveal"><code>pnpm add @offlinejs
+        <pre class="code-panel reveal"><code>pnpm add @offlinejs/client
 
-import { createOfflineDB, OfflineStorage } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",

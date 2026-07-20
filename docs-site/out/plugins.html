@@ -44,7 +44,7 @@ db.use(analytics());</code></pre><p>Good plugin use cases:</p><ul><li>authentica
 <li>schema validation</li>
 <li>devtools</li>
 </ul>
-Plugins receive <code>db</code>, <code>events</code>, <code>network</code>, and <code>storage</code>. They may return a disposer function.</p><h2>Devtools packages</h2><pre><code>import { createOfflineDB, createDevtoolsController, devtools } from &quot;@offlinejs&quot;;
+Plugins receive <code>db</code>, <code>events</code>, <code>network</code>, and <code>storage</code>. They may return a disposer function.</p><h2>Devtools packages</h2><pre><code>import { createOfflineDB, createDevtoolsController, devtools } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({
   storage: &quot;indexeddb&quot;,

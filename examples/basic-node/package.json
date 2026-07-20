@@ -6,7 +6,7 @@
     "start": "tsx index.ts"
   },
   "dependencies": {
-    "@offlinejs": "workspace:*"
+    "@offlinejs/client": "workspace:*"
   },
   "devDependencies": {
     "tsx": "latest",

@@ -1,7 +1,7 @@
 {
-  "name": "@offlinejs",
+  "name": "@offlinejs/client",
   "version": "0.1.0",
-  "description": "One-import OfflineJS SDK. Use specialized @offlinejs/* packages only when you need them.",
+  "description": "One-import OfflineJS client SDK. Use specialized @offlinejs/* packages only when you need them.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -21,7 +21,6 @@
     "@offlinejs/auth": "workspace:*",
     "@offlinejs/benchmarks": "workspace:*",
     "@offlinejs/conflicts": "workspace:*",
-    "@offlinejs/coordination": "workspace:*",
     "@offlinejs/core": "workspace:*",
     "@offlinejs/devtools": "workspace:*",
     "@offlinejs/devtools-ui": "workspace:*",
@@ -29,7 +28,6 @@
     "@offlinejs/network": "workspace:*",
     "@offlinejs/next": "workspace:*",
     "@offlinejs/react": "workspace:*",
-    "@offlinejs/service-worker": "workspace:*",
     "@offlinejs/storage-indexeddb": "workspace:*",
     "@offlinejs/storage-memory": "workspace:*",
     "@offlinejs/storage-opfs": "workspace:*",
@@ -37,7 +35,9 @@
     "@offlinejs/sync-protocol": "workspace:*",
     "@offlinejs/types": "workspace:*",
     "@offlinejs/validation": "workspace:*",
-    "@offlinejs/worker-sync": "workspace:*"
+    "@offlinejs/worker-sync": "workspace:*",
+    "@offlinejs/broadcast": "workspace:*",
+    "@offlinejs/sw": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"

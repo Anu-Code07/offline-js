@@ -11,7 +11,7 @@ const pkg = (name, file = "src/index.ts") => join(workspace, "packages", name, f
 await esbuild.build({
   absWorkingDir: workspace,
   alias: {
-    "@offlinejs": pkg("offlinejs"),
+    "@offlinejs/client": pkg("offlinejs"),
     "@offlinejs/core": pkg("core"),
     "@offlinejs/types": pkg("types"),
     "@offlinejs/utils": pkg("utils"),
@@ -27,8 +27,8 @@ await esbuild.build({
     "@offlinejs/benchmarks": pkg("benchmarks"),
     "@offlinejs/validation": pkg("validation"),
     "@offlinejs/encryption": pkg("encryption"),
-    "@offlinejs/service-worker": pkg("service-worker"),
-    "@offlinejs/coordination": pkg("coordination"),
+    "@offlinejs/sw": pkg("service-worker"),
+    "@offlinejs/broadcast": pkg("coordination"),
     "@offlinejs/conflicts": pkg("conflicts"),
     "@offlinejs/worker-sync": pkg("worker-sync"),
     "@offlinejs/devtools": pkg("devtools"),

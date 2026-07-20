@@ -1,5 +1,5 @@
 {
-  "name": "@offlinejs/service-worker",
+  "name": "@offlinejs/sw",
   "version": "0.1.0",
   "description": "Service Worker background sync plugin for OfflineJS.",
   "type": "module",
