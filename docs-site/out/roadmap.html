@@ -27,9 +27,9 @@
         <a href="quick-start.html">Quick Start</a><a href="api.html">API</a><a href="architecture.html">Architecture</a><a href="storage.html">Storage</a><a href="sync.html">Sync</a><a href="plugins.html">Plugins</a><a href="contracts.html">Contracts</a><a href="practices.html">Practices</a><a href="roadmap.html" aria-current="page">Roadmap</a><a href="faq.html">FAQ</a>
       </aside>
       <article class="content reveal">
-        <h1>Roadmap Implementation</h1><p>This document maps the v0.2 through v0.8 roadmap to the packages now available in the
-workspace. These are production-facing foundations: APIs are typed, framework-independent where
-possible, and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin and worker handler helpers.</li>
+        <h1>Roadmap Implementation</h1><p>This document maps the v0.2 through v0.8 roadmap to the packages available in the workspace.
+These are production-facing foundations: APIs are typed, framework-independent where possible,
+and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin and worker handler helpers.</li>
 <li>Adapter-level indexes: <code>createIndex</code>, <code>dropIndex</code>, and <code>listIndexes</code> on indexable adapters.</li>
 <li><code>@offlinejs/network</code>: middleware and timeout-aware fetch transport.</li>
 <li><code>@offlinejs/react</code>: <code>useOfflineCollection</code> and <code>useOfflineRecords</code> built on</li>
@@ -48,9 +48,10 @@ possible, and designed to harden further without breaking <code>@offlinejs/core<
 <li><code>@offlinejs/sync-protocol</code>: reference push/pull protocol envelopes and handlers.</li>
 <li><code>@offlinejs/benchmarks</code>: 100k-record benchmark utilities.</li>
 </ul>
-<h2>Example composition</h2><p><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
+<h2>Example composition</h2><p>Compose packages around <code>@offlinejs/core</code>. Start with storage + transport, then layer plugins.</p><h3>Browser production stack</h3><p>Validation + encryption + auth + background sync + multi-tab coordination:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
 import { createAuthTransport } from &quot;@offlinejs/auth&quot;;
 import { createBroadcastCoordination, coordinationPlugin } from &quot;@offlinejs/coordination&quot;;
+import { createFieldMergeResolver } from &quot;@offlinejs/conflicts&quot;;
 import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from &quot;@offlinejs/encryption&quot;;
 import { createFetchTransport } from &quot;@offlinejs/network&quot;;
 import { backgroundSyncPlugin } from &quot;@offlinejs/service-worker&quot;;
@@ -58,20 +59,101 @@ import { createIndexedDBStorage } from &quot;@offlinejs/storage-indexeddb&quot;;
 import { createValidatedStorage, createRequiredFieldsValidator } from &quot;@offlinejs/validation&quot;;
 
 const baseStorage = createIndexedDBStorage({ databaseName: &quot;app&quot; });
+
+// Optional secondary index for query performance
+await baseStorage.createIndex?.({
+  collection: &quot;todos&quot;,
+  name: &quot;byCompleted&quot;,
+  keyPath: &quot;completed&quot;
+});
+
+const key = await crypto.subtle.generateKey({ name: &quot;AES-GCM&quot;, length: 256 }, true, [
+  &quot;encrypt&quot;,
+  &quot;decrypt&quot;
+]);
 const codec = await createWebCryptoAesGcmCodec(key);
+
 const storage = createValidatedStorage(createJsonEncryptionStorage(baseStorage, codec), {
   todos: createRequiredFieldsValidator([&quot;title&quot;])
 });
+
 const transport = createAuthTransport(
-  createFetchTransport({ baseURL: &quot;https://api.example.com&quot;, timeoutMs: 10_000 }),
-  { tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;) }
+  createFetchTransport({
+    baseURL: &quot;https://api.example.com&quot;,
+    timeoutMs: 10_000
+  }),
+  {
+    tokenProvider: () =&gt; localStorage.getItem(&quot;token&quot;)
+  }
 );
 
 const db = createOfflineDB({
   storage,
   transport,
+  sync: {
+    autoStart: true,
+    conflictStrategy: createFieldMergeResolver({
+      title: &quot;client&quot;,
+      completed: &quot;lastWriteWins&quot;,
+      updatedAt: &quot;max&quot;
+    })
+  },
   plugins: [backgroundSyncPlugin(), coordinationPlugin(createBroadcastCoordination())]
-});</code></pre>
+});
+
+const todos = db.collection(&quot;todos&quot;);
+await todos.create({ title: &quot;Works offline&quot;, completed: false });</code></pre><h3>React UI on top of the same DB</h3><pre><code>import { useOfflineCollection } from &quot;@offlinejs/react&quot;;
+
+function TodoList({ todos }) {
+  const { records, create, update, delete: remove } = useOfflineCollection(todos);
+
+  return (
+    &lt;ul&gt;
+      {records.map((todo) =&gt; (
+        &lt;li key={todo.id}&gt;
+          &lt;button onClick={() =&gt; update(todo.id, { completed: !todo.completed })}&gt;
+            {todo.title}
+          &lt;/button&gt;
+          &lt;button onClick={() =&gt; remove(todo.id)}&gt;Delete&lt;/button&gt;
+        &lt;/li&gt;
+      ))}
+      &lt;button onClick={() =&gt; create({ title: &quot;New todo&quot;, completed: false })}&gt;Add&lt;/button&gt;
+    &lt;/ul&gt;
+  );
+}</code></pre><h3>Devtools timeline</h3><pre><code>import { createDevtoolsController } from &quot;@offlinejs/devtools-ui&quot;;
+
+const devtools = createDevtoolsController(db);
+devtools.mount(document.getElementById(&quot;offlinejs-devtools&quot;));</code></pre><h3>Worker-based sync</h3><pre><code>import { createWorkerSyncPlugin } from &quot;@offlinejs/worker-sync&quot;;
+
+const worker = new Worker(new URL(&quot;./offline-sync.worker.ts&quot;, import.meta.url), {
+  type: &quot;module&quot;
+});
+
+const db = createOfflineDB({
+  storage,
+  transport,
+  plugins: [createWorkerSyncPlugin(worker)]
+});</code></pre><h3>Next.js cache tags + server action sync</h3><pre><code>import { createServerActionSync, offlineCacheTag } from &quot;@offlinejs/next&quot;;
+
+export const syncTodos = createServerActionSync(db, &quot;todos&quot;);
+
+export const todoTag = (id: string) =&gt; offlineCacheTag(&quot;todos&quot;, id);</code></pre><h3>Large datasets (OPFS or SQLite)</h3><pre><code>import { createOPFSStorage } from &quot;@offlinejs/storage-opfs&quot;;
+// or: import { createSQLiteStorage } from &quot;@offlinejs/storage-sqlite&quot;;
+
+const db = createOfflineDB({
+  storage: createOPFSStorage({ rootDirectoryName: &quot;offlinejs&quot; }),
+  transport
+});</code></pre><h3>Server sync protocol reference</h3><p>Use <code>@offlinejs/sync-protocol</code> on the API side to speak the same push/pull envelopes the client expects:</p><pre><code>import { handlePull, handlePush } from &quot;@offlinejs/sync-protocol&quot;;
+
+app.post(&quot;/sync/push&quot;, async (req, res) =&gt; {
+  res.json(await handlePush(store, req.body));
+});
+
+app.get(&quot;/sync/pull&quot;, async (req, res) =&gt; {
+  res.json(await handlePull(store, req.query));
+});</code></pre><h2>Suggested install sets</h2><p>Browser app:</p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network @offlinejs/react</code></pre><p>Hardened browser app:</p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-indexeddb @offlinejs/network \
+  @offlinejs/validation @offlinejs/encryption @offlinejs/auth \
+  @offlinejs/service-worker @offlinejs/coordination @offlinejs/conflicts @offlinejs/react</code></pre><p>Node / tests:</p><p><pre><code>pnpm add @offlinejs/core @offlinejs/storage-memory</code></pre>
 </p>
       </article>
     </div>

@@ -385,6 +385,39 @@ Static HTML is written to `docs-site/out` (committed) and mirrored to `docs-site
 
 Vercel publishes `docs-site/out` with install/build commands set to `true` (no pnpm, no compile). See [`docs-site/README.md`](./docs-site/README.md) for the exact Vercel project settings.
 
+## Advanced package composition
+
+Layer optional packages around `@offlinejs/core` instead of rewriting your app API:
+
+```ts
+import { createOfflineDB } from "@offlinejs/core";
+import { createAuthTransport } from "@offlinejs/auth";
+import { createBroadcastCoordination, coordinationPlugin } from "@offlinejs/coordination";
+import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from "@offlinejs/encryption";
+import { createFetchTransport } from "@offlinejs/network";
+import { backgroundSyncPlugin } from "@offlinejs/service-worker";
+import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
+import { createValidatedStorage, createRequiredFieldsValidator } from "@offlinejs/validation";
+
+const baseStorage = createIndexedDBStorage({ databaseName: "app" });
+const codec = await createWebCryptoAesGcmCodec(key);
+const storage = createValidatedStorage(createJsonEncryptionStorage(baseStorage, codec), {
+  todos: createRequiredFieldsValidator(["title"])
+});
+
+const db = createOfflineDB({
+  storage,
+  transport: createAuthTransport(
+    createFetchTransport({ baseURL: "https://api.example.com", timeoutMs: 10_000 }),
+    { tokenProvider: () => localStorage.getItem("token") }
+  ),
+  plugins: [backgroundSyncPlugin(), coordinationPlugin(createBroadcastCoordination())]
+});
+```
+
+Full version map (v0.2–v0.8), React/Next/worker examples, and install sets:
+[docs/roadmap-implementation.md](./docs/roadmap-implementation.md).
+
 ## Tips for production apps
 
 - Prefer IndexedDB (or SQLite/OPFS) over memory storage in real apps.
