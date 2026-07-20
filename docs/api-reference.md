@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-pnpm add @offlinejs
+pnpm add @offlinejs/client
 ```
 
 ## `createOfflineDB(options)`
@@ -11,7 +11,7 @@ pnpm add @offlinejs
 Creates a framework-agnostic offline database from the one-import package.
 
 ```ts
-import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
@@ -35,7 +35,7 @@ import {
   createAuthTransport,
   createSQLiteStorage,
   useOfflineCollection
-} from "@offlinejs";
+} from "@offlinejs/client";
 ```
 
 Or import only that package when you want a smaller bundle:

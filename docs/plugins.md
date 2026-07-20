@@ -29,7 +29,7 @@ Plugins receive `db`, `events`, `network`, and `storage`. They may return a disp
 ## Devtools packages
 
 ```ts
-import { createOfflineDB, createDevtoolsController, devtools } from "@offlinejs";
+import { createOfflineDB, createDevtoolsController, devtools } from "@offlinejs/client";
 
 const db = createOfflineDB({
   storage: "indexeddb",

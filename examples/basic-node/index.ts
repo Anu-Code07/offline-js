@@ -1,4 +1,4 @@
-import { createOfflineDB, OfflineStorage } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 type ExampleData = {
   users: {

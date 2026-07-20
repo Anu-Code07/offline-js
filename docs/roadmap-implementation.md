@@ -6,7 +6,7 @@ and designed to harden further without breaking `@offlinejs/core`.
 
 ## v0.2
 
-- `@offlinejs/service-worker`: background sync plugin, SW registration helper, and tag-aware
+- `@offlinejs/sw`: background sync plugin, SW registration helper, and tag-aware
   worker handler helpers.
 - Adapter-level indexes: `createIndex`, `dropIndex`, and `listIndexes` on indexable adapters,
   with equality-filter acceleration and unique constraints (memory, IndexedDB, SQLite, OPFS).
@@ -35,7 +35,7 @@ and designed to harden further without breaking `@offlinejs/core`.
 
 ## v0.8
 
-- `@offlinejs/coordination`: BroadcastChannel-based multi-tab coordination with leader
+- `@offlinejs/broadcast`: BroadcastChannel-based multi-tab coordination with leader
   election and debounced sync.
 - `@offlinejs/conflicts`: CRDT-friendly merge helpers (counters, sets, OR-Map, tombstones).
 - `@offlinejs/sync-protocol`: reference push/pull protocol envelopes and handlers with
@@ -53,11 +53,11 @@ Validation + encryption + auth + background sync + multi-tab coordination:
 ```ts
 import { createOfflineDB } from "@offlinejs/core";
 import { createAuthTransport } from "@offlinejs/auth";
-import { createBroadcastCoordination, coordinationPlugin } from "@offlinejs/coordination";
+import { createBroadcastCoordination, coordinationPlugin } from "@offlinejs/broadcast";
 import { createFieldMergeResolver } from "@offlinejs/conflicts";
 import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from "@offlinejs/encryption";
 import { createFetchTransport } from "@offlinejs/network";
-import { backgroundSyncPlugin } from "@offlinejs/service-worker";
+import { backgroundSyncPlugin } from "@offlinejs/sw";
 import { createIndexedDBStorage } from "@offlinejs/storage-indexeddb";
 import { createValidatedStorage, createRequiredFieldsValidator } from "@offlinejs/validation";
 
@@ -212,17 +212,17 @@ app.get("/sync/pull", async (req, res) => {
 Default (one package):
 
 ```bash
-pnpm add @offlinejs
+pnpm add @offlinejs/client
 ```
 
 ```ts
-import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from "@offlinejs";
+import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from "@offlinejs/client";
 ```
 
 Node / tests:
 
 ```ts
-import { createOfflineDB } from "@offlinejs";
+import { createOfflineDB } from "@offlinejs/client";
 
 const db = createOfflineDB({ storage: "memory", sync: { enabled: false } });
 ```

@@ -50,7 +50,7 @@ importers:
 
   examples/basic-node:
     dependencies:
-      '@offlinejs':
+      '@offlinejs/client':
         specifier: workspace:*
         version: link:../../packages/offlinejs
     devDependencies:
@@ -229,12 +229,12 @@ importers:
       '@offlinejs/benchmarks':
         specifier: workspace:*
         version: link:../benchmarks
+      '@offlinejs/broadcast':
+        specifier: workspace:*
+        version: link:../coordination
       '@offlinejs/conflicts':
         specifier: workspace:*
         version: link:../conflicts
-      '@offlinejs/coordination':
-        specifier: workspace:*
-        version: link:../coordination
       '@offlinejs/core':
         specifier: workspace:*
         version: link:../core
@@ -256,9 +256,6 @@ importers:
       '@offlinejs/react':
         specifier: workspace:*
         version: link:../react
-      '@offlinejs/service-worker':
-        specifier: workspace:*
-        version: link:../service-worker
       '@offlinejs/storage-indexeddb':
         specifier: workspace:*
         version: link:../storage-indexeddb
@@ -271,6 +268,9 @@ importers:
       '@offlinejs/storage-sqlite':
         specifier: workspace:*
         version: link:../storage-sqlite
+      '@offlinejs/sw':
+        specifier: workspace:*
+        version: link:../service-worker
       '@offlinejs/sync-protocol':
         specifier: workspace:*
         version: link:../sync-protocol

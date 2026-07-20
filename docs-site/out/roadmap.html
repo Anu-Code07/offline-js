@@ -30,7 +30,7 @@
       <article class="content reveal">
         <h1>Roadmap Implementation</h1><p>This document maps the v0.2 through v0.8 roadmap to the packages available in the workspace.
 These are production-facing foundations: APIs are typed, framework-independent where possible,
-and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/service-worker</code>: background sync plugin, SW registration helper, and tag-aware</li>
+and designed to harden further without breaking <code>@offlinejs/core</code>.</p><h2>v0.2</h2><ul><li><code>@offlinejs/sw</code>: background sync plugin, SW registration helper, and tag-aware</li>
 </ul>  worker handler helpers.
 <ul><li>Adapter-level indexes: <code>createIndex</code>, <code>dropIndex</code>, and <code>listIndexes</code> on indexable adapters,</li>
 </ul>  with equality-filter acceleration and unique constraints (memory, IndexedDB, SQLite, OPFS).
@@ -49,7 +49,7 @@ and designed to harden further without breaking <code>@offlinejs/core</code>.</p
 <ul><li><code>@offlinejs/worker-sync</code>: worker message protocol, runtime helpers, and attach helper.</li>
 <li><code>@offlinejs/devtools-ui</code>: framework-free event timeline renderer.</li>
 </ul>
-<h2>v0.8</h2><ul><li><code>@offlinejs/coordination</code>: BroadcastChannel-based multi-tab coordination with leader</li>
+<h2>v0.8</h2><ul><li><code>@offlinejs/broadcast</code>: BroadcastChannel-based multi-tab coordination with leader</li>
 </ul>  election and debounced sync.
 <ul><li><code>@offlinejs/conflicts</code>: CRDT-friendly merge helpers (counters, sets, OR-Map, tombstones).</li>
 <li><code>@offlinejs/sync-protocol</code>: reference push/pull protocol envelopes and handlers with</li>
@@ -58,11 +58,11 @@ and designed to harden further without breaking <code>@offlinejs/core</code>.</p
 </ul>
 <h2>Example composition</h2><p>Compose packages around <code>@offlinejs/core</code>. Start with storage + transport, then layer plugins.</p><h3>Browser production stack</h3><p>Validation + encryption + auth + background sync + multi-tab coordination:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs/core&quot;;
 import { createAuthTransport } from &quot;@offlinejs/auth&quot;;
-import { createBroadcastCoordination, coordinationPlugin } from &quot;@offlinejs/coordination&quot;;
+import { createBroadcastCoordination, coordinationPlugin } from &quot;@offlinejs/broadcast&quot;;
 import { createFieldMergeResolver } from &quot;@offlinejs/conflicts&quot;;
 import { createJsonEncryptionStorage, createWebCryptoAesGcmCodec } from &quot;@offlinejs/encryption&quot;;
 import { createFetchTransport } from &quot;@offlinejs/network&quot;;
-import { backgroundSyncPlugin } from &quot;@offlinejs/service-worker&quot;;
+import { backgroundSyncPlugin } from &quot;@offlinejs/sw&quot;;
 import { createIndexedDBStorage } from &quot;@offlinejs/storage-indexeddb&quot;;
 import { createValidatedStorage, createRequiredFieldsValidator } from &quot;@offlinejs/validation&quot;;
 
@@ -171,7 +171,7 @@ app.post(&quot;/sync/push&quot;, async (req, res) =&gt; {
 
 app.get(&quot;/sync/pull&quot;, async (req, res) =&gt; {
   res.json(await handlePull(store, req.query));
-});</code></pre><h2>Suggested install sets</h2><p>Default (one package):</p><pre><code>pnpm add @offlinejs</code></pre><pre><code>import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from &quot;@offlinejs&quot;;</code></pre><p>Node / tests:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs&quot;;
+});</code></pre><h2>Suggested install sets</h2><p>Default (one package):</p><pre><code>pnpm add @offlinejs/client</code></pre><pre><code>import { createOfflineDB, useOfflineCollection, backgroundSyncPlugin } from &quot;@offlinejs/client&quot;;</code></pre><p>Node / tests:</p><pre><code>import { createOfflineDB } from &quot;@offlinejs/client&quot;;
 
 const db = createOfflineDB({ storage: &quot;memory&quot;, sync: { enabled: false } });</code></pre><p>Tree-shake a single advanced adapter when you want a minimal bundle:</p><p><pre><code>pnpm add @offlinejs/storage-sqlite</code></pre>
 </p>

@@ -1,5 +1,5 @@
 {
-  "name": "@offlinejs/coordination",
+  "name": "@offlinejs/broadcast",
   "version": "0.1.0",
   "description": "Multi-tab coordination helpers for OfflineJS.",
   "type": "module",

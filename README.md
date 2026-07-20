@@ -5,7 +5,7 @@ Offline-first data layer for TypeScript and JavaScript.
 Write to local storage immediately. Sync when the network is back. Retry failed mutations automatically. Resolve conflicts with a strategy you choose.
 
 ```ts
-import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   baseURL: "https://api.example.com",
@@ -24,7 +24,7 @@ const open = await todos.find({ filters: { completed: false } });
 One package for the common path:
 
 ```bash
-pnpm add @offlinejs
+pnpm add @offlinejs/client
 ```
 
 Need something specialized later? Keep using `@offlinejs`, or import only that package for a smaller bundle:
@@ -57,7 +57,7 @@ type AppData = {
 ### 2. Create the database
 
 ```ts
-import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs";
+import { ConflictStrategyName, createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB<AppData>({
   baseURL: "https://api.example.com",
@@ -183,7 +183,7 @@ db.on("error", (error) => {
 Built-in options: `clientWins`, `serverWins`, `lastWriteWins`, `merge`, or a custom resolver.
 
 ```ts
-import { createOfflineDB, OfflineStorage } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   storage: OfflineStorage.IndexedDB,
@@ -200,7 +200,7 @@ const db = createOfflineDB({
 ### Use memory storage in tests or Node
 
 ```ts
-import { createOfflineDB, OfflineStorage } from "@offlinejs";
+import { createOfflineDB, OfflineStorage } from "@offlinejs/client";
 
 const db = createOfflineDB({
   storage: OfflineStorage.Memory,
@@ -216,7 +216,7 @@ Runnable example: [`examples/basic-node`](./examples/basic-node).
 ### Use React hooks
 
 ```tsx
-import { useOfflineCollection } from "@offlinejs";
+import { useOfflineCollection } from "@offlinejs/client";
 
 function TodoList({ todos }) {
   const { records, create, update, delete: remove } = useOfflineCollection(todos);
@@ -259,7 +259,7 @@ Common plugin use cases: auth headers, logging, validation, encryption, analytic
 Use this when your backend does not match the default fetch paths.
 
 ```ts
-import { createOfflineDB, OfflineStorage, type SyncTransport } from "@offlinejs";
+import { createOfflineDB, OfflineStorage, type SyncTransport } from "@offlinejs/client";
 
 const transport: SyncTransport = {
   async request(request) {
@@ -291,7 +291,7 @@ import {
   StorageError,
   SyncError,
   ValidationError
-} from "@offlinejs";
+} from "@offlinejs/client";
 
 try {
   await todos.sync();
@@ -396,7 +396,7 @@ import {
   createRequiredFieldsValidator,
   createValidatedStorage,
   createWebCryptoAesGcmCodec
-} from "@offlinejs";
+} from "@offlinejs/client";
 
 const baseStorage = createIndexedDBStorage({ databaseName: "app" });
 const codec = await createWebCryptoAesGcmCodec(key);

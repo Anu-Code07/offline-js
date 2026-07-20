@@ -11,7 +11,7 @@ export default defineConfig({
       { find: "@offlinejs/auth", replacement: pkg("./packages/auth/src/index.ts") },
       { find: "@offlinejs/benchmarks", replacement: pkg("./packages/benchmarks/src/index.ts") },
       { find: "@offlinejs/conflicts", replacement: pkg("./packages/conflicts/src/index.ts") },
-      { find: "@offlinejs/coordination", replacement: pkg("./packages/coordination/src/index.ts") },
+      { find: "@offlinejs/broadcast", replacement: pkg("./packages/coordination/src/index.ts") },
       { find: "@offlinejs/devtools-ui", replacement: pkg("./packages/devtools-ui/src/index.ts") },
       { find: "@offlinejs/devtools", replacement: pkg("./packages/devtools/src/index.ts") },
       { find: "@offlinejs/encryption", replacement: pkg("./packages/encryption/src/index.ts") },
@@ -20,7 +20,7 @@ export default defineConfig({
       { find: "@offlinejs/queue", replacement: pkg("./packages/queue/src/index.ts") },
       { find: "@offlinejs/react", replacement: pkg("./packages/react/src/index.ts") },
       {
-        find: "@offlinejs/service-worker",
+        find: "@offlinejs/sw",
         replacement: pkg("./packages/service-worker/src/index.ts")
       },
       {
@@ -42,6 +42,7 @@ export default defineConfig({
       { find: "@offlinejs/utils", replacement: pkg("./packages/utils/src/index.ts") },
       { find: "@offlinejs/validation", replacement: pkg("./packages/validation/src/index.ts") },
       { find: "@offlinejs/worker-sync", replacement: pkg("./packages/worker-sync/src/index.ts") },
+      { find: "@offlinejs/client", replacement: pkg("./packages/offlinejs/src/index.ts") },
       { find: /^@offlinejs$/, replacement: pkg("./packages/offlinejs/src/index.ts") }
     ]
   },
