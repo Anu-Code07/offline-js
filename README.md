@@ -359,7 +359,7 @@ db.on("sync:start" | "sync:end" | "offline" | "online" | "queue:add" | "queue:co
 | `@offlinejs/encryption` | Encrypt records at rest |
 | `@offlinejs/devtools` / `@offlinejs/devtools-ui` | Redux-style Action/State DevTools (floating dock or inline) |
 | `@offlinejs/http-cache` | TTL / SWR HTTP GET cache |
-| `@offlinejs/media-queue` | Durable offline media uploads (compress, chunk, resume) |
+| `@offlinejs/media-queue` | Durable offline **photo** uploads (images MVP; video/tus/S3/iOS bg later) |
 
 ## Docs
 
